@@ -1,0 +1,42 @@
+# Android
+app/build/
+app/.gradle/
+app/local.properties
+app/*.apk
+*.class
+*.dex
+*.jar
+*.war
+*.nar
+*.ear
+
+# Gradle
+.gradle/
+build/
+*/build/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Node
+node_modules/
+*/node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+
+# Data
+agent/data/
+*.db
+*.db-shm
+*.db-wal
+
+# OS
+Thumbs.db

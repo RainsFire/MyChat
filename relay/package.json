@@ -1,0 +1,14 @@
+{
+  "name": "mychat-relay",
+  "version": "1.0.0",
+  "description": "MyChat 云中继服务器",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/test-relay.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0",
+    "bcrypt": "^5.1.1"
+  }
+}

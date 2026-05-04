@@ -1,0 +1,16 @@
+{
+  "apps": [{
+    "name": "mychat-relay",
+    "script": "server.js",
+    "cwd": "/root/relay",
+    "env": {
+      "MYCHAT_PORT": 9090,
+      "MYCHAT_USER": "rains2009",
+      "MYCHAT_PASS_HASH": "$2b$10$.Fn1dvl2XApGpyF1SMDKku30SJy.sMAQuGLOPQugiXnDlfI72bBa2"
+    },
+    "watch": false,
+    "autorestart": true,
+    "max_restarts": 10,
+    "restart_delay": 3000
+  }]
+}

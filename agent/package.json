@@ -1,0 +1,15 @@
+{
+  "name": "mychat-agent",
+  "version": "1.0.0",
+  "description": "MyChat Mac 桌面客户端 - 连接中继并管理 Claude CLI",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js",
+    "test": "node test/test-agent.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^11.7.0",
+    "ws": "^8.18.0"
+  }
+}

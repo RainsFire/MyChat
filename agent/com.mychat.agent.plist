@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.mychat.agent</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/node</string>
+        <string>/Users/alex/MyChat/agent/agent.js</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/alex/MyChat/agent</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>MYCHAT_RELAY_URL</key>
+        <string>ws://your-relay-server:9090</string>
+        <key>MYCHAT_USER</key>
+        <string>admin</string>
+        <key>MYCHAT_PASS</key>
+        <string>changeme</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/alex/MyChat/agent/logs/agent.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/alex/MyChat/agent/logs/agent-error.log</string>
+</dict>
+</plist>
