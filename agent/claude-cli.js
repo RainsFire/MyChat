@@ -5,11 +5,12 @@
  */
 
 const { spawn } = require('child_process');
+const Session = require('./session');
 
 class ClaudeCLI {
   constructor(onReply, onComplete, onPermissionRequest, onChoiceRequest) {
     this.process = null;
-    this.sessionId = null;
+    this.session = new Session();
     this.onReply = onReply;
     this.onComplete = onComplete;
     this.onPermissionRequest = onPermissionRequest;
@@ -30,8 +31,11 @@ class ClaudeCLI {
     if (this.mode === 'auto') {
       args.push('--dangerously-skip-permissions');
     }
-    if (this.sessionId) {
-      args.push('--resume', this.sessionId);
+    if (this.session.sessionId) {
+      args.push('--resume', this.session.sessionId);
+      console.log(`[CLI] 恢复会话: ${this.session.sessionId.slice(0, 8)}...`);
+    } else {
+      console.log('[CLI] 开始新会话');
     }
 
     console.log(`[CLI] 启动: claude ${args.slice(0, 4).join(' ')}...`);
@@ -80,6 +84,11 @@ class ClaudeCLI {
     console.log(`[CLI] 切换模式: ${mode}`);
   }
 
+  resetSession() {
+    this.session.clear();
+    console.log('[CLI] 会话已重置，下一条消息将开始新会话');
+  }
+
   respondPermission(approved) {
     console.log(`[CLI] 权限响应(忽略): ${approved ? '允许' : '拒绝'}`);
   }
@@ -124,12 +133,12 @@ class ClaudeCLI {
           }
         }
       }
-      if (msg.session_id) this.sessionId = msg.session_id;
+      if (msg.session_id) this.session.save(msg.session_id);
     } else if (msg.type === 'result') {
-      if (msg.session_id) this.sessionId = msg.session_id;
+      if (msg.session_id) this.session.save(msg.session_id);
       this._finishResponse();
     } else if (msg.type === 'system') {
-      if (msg.session_id) this.sessionId = msg.session_id;
+      if (msg.session_id) this.session.save(msg.session_id);
     }
   }
 

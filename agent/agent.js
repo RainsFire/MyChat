@@ -258,6 +258,26 @@ class Agent {
         }
         break;
 
+      case 'reset_session':
+        this.cli.resetSession();
+        if (this.crypto.ready && this.ws.readyState === 1) {
+          const payload = this.crypto.encrypt({ type: 'session_reset_ok' });
+          this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
+        }
+        break;
+
+      case 'query_session_status':
+        if (this.crypto.ready && this.ws.readyState === 1) {
+          const status = this.cli.session.getStatus();
+          const payload = this.crypto.encrypt({
+            type: 'session_status',
+            hasSession: status.hasSession,
+            createdAt: status.createdAt
+          });
+          this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
+        }
+        break;
+
       case 'upload_crash_log':
         // 保存崩溃日志
         const fs = require('fs');

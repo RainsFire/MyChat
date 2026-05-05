@@ -146,6 +146,15 @@ class ChatRepository(
         relayClient.sendPing()
     }
 
+    fun resetSession() {
+        relayClient.sendResetSession()
+        AppLogger.i(tag, "请求重置会话")
+    }
+
+    fun querySessionStatus() {
+        relayClient.sendQuerySessionStatus()
+    }
+
     private fun handleEvent(event: RelayEvent) {
         when (event) {
             is RelayEvent.ChatReply -> {
@@ -167,6 +176,12 @@ class ChatRepository(
             }
             is RelayEvent.CrashLogReceived -> {
                 AppLogger.d(tag, "崩溃日志已接收")
+            }
+            is RelayEvent.SessionResetOk -> {
+                AppLogger.d(tag, "会话已重置")
+            }
+            is RelayEvent.SessionStatus -> {
+                AppLogger.d(tag, "会话状态: hasSession=${event.hasSession}")
             }
         }
     }
