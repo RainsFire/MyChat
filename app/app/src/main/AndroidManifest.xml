@@ -30,6 +30,11 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".service.ChatService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
     </application>
 
 </manifest>

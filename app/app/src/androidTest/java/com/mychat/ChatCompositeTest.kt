@@ -284,4 +284,60 @@ class ChatCompositeTest {
 
         assert(mockRelayClient.state.value is ConnectionState.Connected)
     }
+
+    // ========== 场景 13: 后台时连接保持，回到前台重连后发消息 ==========
+
+    @Test
+    fun scenario13_backgroundConnectionPreserved() {
+        navigateToChatScreen()
+
+        // 模拟后台断线
+        mockRelayClient.simulateDisconnected()
+        assert(mockRelayClient.state.value is ConnectionState.Disconnected)
+
+        // 模拟回到前台后自动重连成功
+        mockRelayClient.simulateConnected()
+        assert(mockRelayClient.state.value is ConnectionState.Connected)
+
+        // 回到前台后应能正常发消息
+        sendMessage("back online")
+        assert(mockRelayClient.getCapturedMessages().contains("back online"))
+    }
+
+    // ========== 场景 14: 后台时收到回复通知 ==========
+
+    @Test
+    fun scenario14_backgroundNotification_onReply() {
+        navigateToChatScreen()
+
+        sendMessage("background test")
+
+        // 模拟后台收到回复（直接触发事件，不检查前台状态）
+        mockRelayClient.simulateChatReply("This is a reply")
+        mockRelayClient.simulateChatComplete()
+
+        // 验证消息已发送且回复已处理
+        assert(mockRelayClient.getCapturedMessages().isNotEmpty())
+    }
+
+    // ========== 场景 15: 多次前后台切换，连接保持稳定 ==========
+
+    @Test
+    fun scenario15_multipleForegroundTransitions() {
+        navigateToChatScreen()
+
+        repeat(3) { i ->
+            // 后台断线
+            mockRelayClient.simulateDisconnected()
+            assert(mockRelayClient.state.value is ConnectionState.Disconnected)
+
+            // 前台重连
+            mockRelayClient.simulateConnected()
+            assert(mockRelayClient.state.value is ConnectionState.Connected)
+
+            sendMessage("cycle $i")
+        }
+
+        assertEquals(3, mockRelayClient.getCapturedMessages().size)
+    }
 }

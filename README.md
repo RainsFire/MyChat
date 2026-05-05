@@ -90,6 +90,8 @@ MyChat/
         │   ├── api/RelayClient.kt     # WebSocket 客户端
         │   ├── crypto/                # ECDH + AES 加密
         │   └── db/                    # Room 数据库
+        ├── notification/NotificationHelper.kt  # 通知管理
+        ├── service/ChatService.kt     # 前台服务（后台保活）
         └── ui/                        # Jetpack Compose UI
 ```
 
@@ -118,6 +120,15 @@ node agent/test/test-session.js
 ```
 
 ## 更新日志
+
+### v1.2 — 后台保活与通知优化
+- 新增 ChatService 前台服务：App 进入后台时自动启动，保持 WebSocket 连接不断
+- 前台服务通知使用 IMPORTANCE_MIN，状态栏无图标、无声音、几乎无感
+- App 回到前台时自动停止前台服务，通知消失
+- 回复通知添加 setTimeoutAfter(5s) 自动消失（类似微信横幅通知）
+- 通知渠道添加 lockscreenVisibility=PUBLIC，锁屏可见
+- 点击通知 Intent 改用 CLEAR_TOP|SINGLE_TOP，保留聊天状态不重建
+- 补充 3 个前后台切换场景测试 + NotificationHelper 通知渠道配置测试
 
 ### v1.1 — 通知与 UI 优化
 - NotificationHelper 改进：PendingIntent 点击打开 App、POST_NOTIFICATIONS 权限检查

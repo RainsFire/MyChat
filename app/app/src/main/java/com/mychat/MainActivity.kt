@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -37,6 +38,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val viewModel = ViewModelProvider(this)[ChatViewModel::class.java]
+        viewModel.onAppForeground()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        val viewModel = ViewModelProvider(this)[ChatViewModel::class.java]
+        viewModel.onAppBackground()
     }
 }
 

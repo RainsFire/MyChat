@@ -2,6 +2,7 @@ package com.mychat.ui
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mychat.data.api.ConnectionState
@@ -10,6 +11,7 @@ import com.mychat.data.repository.ChatRepository
 import com.mychat.data.store.CredentialStore
 import com.mychat.log.AppLogger
 import com.mychat.notification.NotificationHelper
+import com.mychat.service.ChatService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -40,12 +42,39 @@ class ChatViewModel @Inject constructor(
 
     private val replyBuffer = StringBuilder()
     private var heartbeatJob: Job? = null
+    private var isAppForeground = true
 
     init {
         NotificationHelper.createChannel(application)
         loadMessages()
         listenEvents()
         startHeartbeat()
+    }
+
+    fun onAppForeground() {
+        isAppForeground = true
+        stopForegroundService()
+    }
+
+    fun onAppBackground() {
+        isAppForeground = false
+        if (connectionState.value is ConnectionState.Connected) {
+            startForegroundService()
+        }
+    }
+
+    private fun startForegroundService() {
+        val context = getApplication<Application>()
+        val intent = Intent(context, ChatService::class.java)
+        context.startForegroundService(intent)
+        AppLogger.i("ChatViewModel", "前台服务已启动")
+    }
+
+    private fun stopForegroundService() {
+        val context = getApplication<Application>()
+        val intent = Intent(context, ChatService::class.java)
+        context.stopService(intent)
+        AppLogger.i("ChatViewModel", "前台服务已停止")
     }
 
     private fun startHeartbeat() {
