@@ -25,8 +25,7 @@ android {
             buildConfigField("String", "DEFAULT_RELAY_URL", "\"${property("RELAY_URL_SIT")}\"")
         }
         release {
-            isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            isMinifyEnabled = false
             buildConfigField("String", "DEFAULT_RELAY_URL", "\"${property("RELAY_URL_PROD")}\"")
         }
     }
