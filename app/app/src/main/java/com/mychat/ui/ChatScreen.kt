@@ -35,11 +35,17 @@ fun ChatScreen(
     var showSettings by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
+    var hasScrolledToBottom by remember { mutableStateOf(false) }
 
-    // 新消息时平滑滚动到底部
+    // 初次加载：瞬间跳到底部；新消息：平滑滚动
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            if (!hasScrolledToBottom) {
+                listState.scrollToItem(messages.size - 1)
+                hasScrolledToBottom = true
+            } else {
+                listState.animateScrollToItem(messages.size - 1)
+            }
         }
     }
 
