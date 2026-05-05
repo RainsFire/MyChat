@@ -22,12 +22,21 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".sit"
-            buildConfigField("String", "DEFAULT_RELAY_URL", "\"ws://121.41.103.157:9091\"")
+            buildConfigField("String", "DEFAULT_RELAY_URL", "\"${property("RELAY_URL_SIT")}\"")
         }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            buildConfigField("String", "DEFAULT_RELAY_URL", "\"ws://121.41.103.157:9090\"")
+            buildConfigField("String", "DEFAULT_RELAY_URL", "\"${property("RELAY_URL_PROD")}\"")
+        }
+    }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            val suffix = if (variant.buildType.name == "debug") "-SIT" else ""
+            output.outputFileName = "MyChat${suffix}-${variant.versionName}.apk"
         }
     }
 
