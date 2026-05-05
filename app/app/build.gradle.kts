@@ -20,10 +20,20 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".sit"
+            buildConfigField("String", "DEFAULT_RELAY_URL", "\"ws://121.41.103.157:9091\"")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("String", "DEFAULT_RELAY_URL", "\"ws://121.41.103.157:9090\"")
         }
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -33,10 +43,6 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-    }
-
-    buildFeatures {
-        compose = true
     }
 
     composeOptions {

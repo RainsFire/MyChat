@@ -3,6 +3,8 @@ package com.mychat.data.store
 import android.content.Context
 import android.content.SharedPreferences
 
+import com.mychat.BuildConfig
+
 object CredentialStore {
     private const val PREFS_NAME = "mychat_credentials"
     private const val KEY_URL = "relay_url"
@@ -10,7 +12,7 @@ object CredentialStore {
     private const val KEY_PASSWORD = "password"
     private const val KEY_AUTO_LOGIN = "auto_login"
 
-    private const val DEFAULT_URL = "ws://121.41.103.157:9090"
+    private val DEFAULT_URL = BuildConfig.DEFAULT_RELAY_URL
     private const val DEFAULT_USERNAME = "admin"
 
     private fun getPrefs(context: Context): SharedPreferences {
