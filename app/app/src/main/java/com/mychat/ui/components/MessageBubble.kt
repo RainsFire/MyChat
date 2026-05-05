@@ -3,14 +3,19 @@ package com.mychat.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mychat.data.db.MessageEntity
+import dev.jeziellago.compose.markdowntext.MarkdownText
 
 @Composable
 fun MessageBubble(
@@ -52,11 +57,36 @@ fun MessageBubble(
                 .padding(horizontal = 14.dp, vertical = 10.dp)
                 .widthIn(max = 260.dp)
         ) {
-            Text(
-                text = message.content,
-                color = textColor,
-                style = MaterialTheme.typography.bodyMedium
-            )
+            SelectionContainer {
+                if (isUser) {
+                    Text(
+                        text = message.content,
+                        color = textColor,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                } else {
+                    if (message.content.length > 20) {
+                        val markdownContent = remember(message.content) { message.content }
+                        MarkdownText(
+                            markdown = markdownContent,
+                            fontSize = 14.sp,
+                            color = textColor,
+                            style = androidx.compose.ui.text.TextStyle(
+                                fontSize = 14.sp,
+                                color = textColor,
+                                fontFamily = FontFamily.Monospace,
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        Text(
+                            text = message.content,
+                            color = textColor,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
         }
     }
 }

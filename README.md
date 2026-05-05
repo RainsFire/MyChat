@@ -1,0 +1,122 @@
+# MyChat
+
+通过手机远程控制 Mac 上的 Claude CLI，实现随时随地的 AI 对话。
+
+## 架构
+
+```
+┌──────────┐    WebSocket     ┌──────────┐    WebSocket     ┌──────────────┐
+│  Android │ ◄──────────────► │  Relay   │ ◄──────────────► │  Mac Agent   │
+│  App     │   E2E Encrypted  │  Server  │   E2E Encrypted  │  (Claude CLI)│
+└──────────┘                  └──────────┘                  └──────────────┘
+```
+
+- **Android App** — Kotlin/Jetpack Compose，负责 UI 和用户交互
+- **Relay Server** — Node.js WebSocket 中继，部署在远程服务器（pm2 守护）
+- **Mac Agent** — Node.js 桌面客户端（launchctl 常驻），管理 Claude CLI 进程
+
+## 端到端加密
+
+使用 ECDH (P-256) 密钥交换 + AES-256-GCM 加密：
+
+1. Mobile 发起 `key_init`，Desktop 响应 `key_response`
+2. 双方通过 ECDH 协商出共享密钥
+3. 所有业务消息（chat、permission、mode 等）均加密传输
+
+## 快速开始
+
+### Relay Server（远程服务器）
+
+```bash
+cd relay
+npm install
+MYCHAT_PORT=9090 MYCHAT_USER=username MYCHAT_PASS_HASH='bcrypt-hash' node server.js
+```
+
+使用 pm2 守护进程：
+
+```bash
+pm2 start server.js --name mychat-relay -- --env production
+```
+
+### Mac Agent
+
+```bash
+cd agent
+npm install
+MYCHAT_RELAY_URL=ws://your-server:9090 MYCHAT_USER=username MYCHAT_PASS=password node agent.js
+```
+
+使用 launchctl 开机自启：
+
+```bash
+cp com.mychat.agent.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.mychat.agent.plist
+```
+
+### Android App
+
+```bash
+cd app
+./gradlew assembleDebug
+```
+
+APK 输出路径：`app/build/outputs/apk/debug/app-debug.apk`
+
+## 项目结构
+
+```
+MyChat/
+├── agent/              # Mac 桌面客户端
+│   ├── agent.js        # Agent 主程序
+│   ├── claude-cli.js   # Claude CLI 进程管理
+│   ├── crypto.js       # 加密模块（ECDH + AES-GCM）
+│   └── store.js        # SQLite 消息存储
+├── relay/              # WebSocket 中继服务器
+│   ├── server.js       # 服务端入口
+│   ├── router.js       # 消息路由
+│   ├── crypto.js       # 加密模块
+│   └── test/           # 测试
+│       ├── test-relay.js    # 中继服务器测试（22 assertions）
+│       ├── test-e2e.js      # 端到端集成测试（21 assertions）
+│       └── test-timing.js   # 连接时序/重连/心跳/异常测试（31 assertions）
+└── app/                # Android 应用
+    └── app/src/main/java/com/mychat/
+        ├── data/
+        │   ├── api/RelayClient.kt     # WebSocket 客户端
+        │   ├── crypto/                # ECDH + AES 加密
+        │   └── db/                    # Room 数据库
+        └── ui/                        # Jetpack Compose UI
+```
+
+## 测试
+
+```bash
+# 中继服务器测试
+node relay/test/test-relay.js
+
+# 端到端集成测试
+node relay/test/test-e2e.js
+
+# 连接时序 & 重连 & 心跳 & 异常测试（10个场景）
+node relay/test/test-timing.js
+
+# Mac Agent 测试
+node agent/test/test-agent.js
+
+# 全部运行（98 个断言）
+```
+
+## 更新日志
+
+### v0.2 — 连接稳定性增强
+- 修复 relay heartbeat pongTimer 泄漏导致连接被误断
+- Agent 添加应用层心跳（25s ping）
+- Agent 添加 device_status 触发的主动密钥交换
+- 修复 launchctl 环境下 claude CLI 找不到的问题（PATH 补全）
+- 修复 launchctl plist 配置（node 路径、连接参数）
+- RelayClient 添加 try/catch 防止解密异常导致 WebSocket 断连
+- ECDHCrypto 添加 completeHandshake null check
+- 补充 10 个连接时序/重连/心跳/异常测试场景
+- ChatScreen UI 优化：分离键盘弹收与新消息滚动逻辑
+- MessageBubble 支持 Markdown 渲染和文本选择

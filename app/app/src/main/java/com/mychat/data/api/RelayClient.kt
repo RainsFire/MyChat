@@ -119,14 +119,19 @@ open class RelayClient {
             JSONObject(text)
         } catch (e: Exception) { return }
 
-        when (RelayProtocol.messageType(msg)) {
-            "auth_ok" -> handleAuthOk()
-            "auth_fail" -> handleAuthFail(msg)
-            "key_init" -> handleKeyInit(msg)
-            "key_response" -> handleKeyResponse(msg)
-            "encrypted" -> handleEncrypted(msg)
-            "device_status" -> handleDeviceStatus(msg)
-            "pong" -> { /* heartbeat response */ }
+        try {
+            when (RelayProtocol.messageType(msg)) {
+                "auth_ok" -> handleAuthOk()
+                "auth_fail" -> handleAuthFail(msg)
+                "key_init" -> handleKeyInit(msg)
+                "key_response" -> handleKeyResponse(msg)
+                "encrypted" -> handleEncrypted(msg)
+                "device_status" -> handleDeviceStatus(msg)
+                "pong" -> { /* heartbeat response */ }
+            }
+        } catch (e: Exception) {
+            AppLogger.e(tag, "处理消息异常: type=${RelayProtocol.messageType(msg)}, error=${e.message}")
+            e.printStackTrace()
         }
     }
 

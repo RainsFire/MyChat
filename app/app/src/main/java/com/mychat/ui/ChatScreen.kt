@@ -36,13 +36,20 @@ fun ChatScreen(
 
     val listState = rememberLazyListState()
 
-    // 自动滚动到底部：新消息 + 键盘弹收 + 输入栏高度变化
+    // 新消息时平滑滚动到底部
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    // 键盘弹收时即时滚动，避免与系统键盘动画冲突产生卡顿
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density)
 
-    LaunchedEffect(messages.size, imeBottom) {
+    LaunchedEffect(imeBottom) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            listState.scrollToItem(messages.size - 1)
         }
     }
 
@@ -50,8 +57,7 @@ fun ChatScreen(
         modifier = Modifier.imePadding(),
         topBar = {
             Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                tonalElevation = 1.dp
+                color = MaterialTheme.colorScheme.background
             ) {
                 Row(
                     modifier = Modifier
@@ -77,7 +83,7 @@ fun ChatScreen(
         },
         bottomBar = {
             Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant
+                color = MaterialTheme.colorScheme.background
             ) {
                 ChatInputBar(
                     isResponding = isResponding,

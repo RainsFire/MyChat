@@ -23,6 +23,7 @@ class Agent {
     this.store = new Store();
     this.reconnectDelay = RECONNECT_BASE;
     this.running = false;
+    this.heartbeatTimer = null;
   }
 
   /**
@@ -94,6 +95,7 @@ class Agent {
         password: PASSWORD,
         device: DEVICE
       }));
+      this._startHeartbeat();
     });
 
     this.ws.on('message', (data) => {
@@ -103,11 +105,13 @@ class Agent {
       } catch (e) {
         return;
       }
+      console.log(`[AGENT] 收到原始消息: type=${msg.type}`);
       this._handleMessage(msg);
     });
 
-    this.ws.on('close', () => {
-      console.log('[AGENT] 连接断开');
+    this.ws.on('close', (code, reason) => {
+      console.log(`[AGENT] 连接断开: code=${code} reason=${reason || '无'}`);
+      this._stopHeartbeat();
       this._scheduleReconnect();
     });
 
@@ -144,6 +148,14 @@ class Agent {
 
       case 'device_status':
         console.log(`[AGENT] 设备状态: ${msg.device} ${msg.online ? '在线' : '离线'}`);
+        // mobile 在线但密钥未就绪：等 2 秒让 mobile 先发起，超时则 desktop 主动发起
+        if (msg.device === 'mobile' && msg.online && !this.crypto.ready) {
+          setTimeout(() => {
+            if (!this.crypto.ready && this.ws && this.ws.readyState === 1) {
+              this._initiateKeyExchange();
+            }
+          }, 2000);
+        }
         break;
 
       case 'pong':
@@ -152,6 +164,18 @@ class Agent {
       default:
         console.log(`[AGENT] 未知消息: ${msg.type}`);
     }
+  }
+
+  /**
+   * 发起密钥交换（desktop 作为发起者）
+   */
+  _initiateKeyExchange() {
+    console.log('[AGENT] 发起密钥交换...');
+    const myPubKey = this.crypto.initAsInitiator();
+    this.ws.send(JSON.stringify({
+      type: 'key_init',
+      publicKey: myPubKey
+    }));
   }
 
   /**
@@ -268,10 +292,30 @@ class Agent {
   }
 
   /**
+   * 应用层心跳，每 25 秒发 ping
+   */
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if (this.ws && this.ws.readyState === 1) {
+        this.ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 25000);
+  }
+
+  _stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  /**
    * 停止 agent
    */
   stop() {
     this.running = false;
+    this._stopHeartbeat();
     if (this.cli) this.cli.stop();
     if (this.ws) this.ws.close();
     this.store.close();

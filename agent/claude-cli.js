@@ -6,8 +6,6 @@
 
 const { spawn } = require('child_process');
 
-const CLI_TIMEOUT = 120000;
-
 class ClaudeCLI {
   constructor(onReply, onComplete, onPermissionRequest, onChoiceRequest) {
     this.process = null;
@@ -18,7 +16,6 @@ class ClaudeCLI {
     this.onChoiceRequest = onChoiceRequest;
     this.mode = 'default';
     this.outputBuffer = '';
-    this.timeoutTimer = null;
     this.isResponding = false;
   }
 
@@ -39,10 +36,11 @@ class ClaudeCLI {
 
     console.log(`[CLI] 启动: claude ${args.slice(0, 4).join(' ')}...`);
 
-    this.process = spawn('claude', args, {
+    const claudeBin = process.env.CLAUDE_BIN || 'claude';
+    this.process = spawn(claudeBin, args, {
       cwd: process.env.HOME,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env }
+      env: { ...process.env, PATH: `${process.env.PATH || ''}:/opt/homebrew/bin:/usr/local/bin` }
     });
 
     this.process.stdout.on('data', (data) => this._handleOutput(data));
@@ -66,8 +64,6 @@ class ClaudeCLI {
       this.onReply('[错误: CLI 启动失败]');
       this._finishResponse();
     });
-
-    this._resetTimeout();
   }
 
   interrupt() {
@@ -93,7 +89,6 @@ class ClaudeCLI {
   }
 
   stop() {
-    if (this.timeoutTimer) clearTimeout(this.timeoutTimer);
     this._kill();
   }
 
@@ -124,7 +119,7 @@ class ClaudeCLI {
             if (block.type === 'text') {
               this.onReply(block.text);
             } else if (block.type === 'tool_use') {
-              this.onReply(`[工具调用: ${block.name}]`);
+              // 不发送工具调用信息到 app
             }
           }
         }
@@ -140,21 +135,7 @@ class ClaudeCLI {
 
   _finishResponse() {
     this.isResponding = false;
-    if (this.timeoutTimer) clearTimeout(this.timeoutTimer);
-    this.timeoutTimer = null;
     this.onComplete();
-  }
-
-  _resetTimeout() {
-    if (this.timeoutTimer) clearTimeout(this.timeoutTimer);
-    this.timeoutTimer = setTimeout(() => {
-      if (this.isResponding) {
-        console.log('[CLI] 超时终止');
-        this._kill();
-        this.onReply('[错误: Claude 响应超时]');
-        this._finishResponse();
-      }
-    }, CLI_TIMEOUT);
   }
 
   _kill() {

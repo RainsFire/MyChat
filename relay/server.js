@@ -54,6 +54,7 @@ wss.on('connection', (ws, req) => {
   let pongTimer = null;
   const pingTimer = setInterval(() => {
     if (ws.readyState !== 1) return;
+    if (pongTimer) clearTimeout(pongTimer);  // 先清除旧定时器
     ws.ping();
     pongTimer = setTimeout(() => {
       console.log(`[RELAY] 心跳超时: ${ws._mychatUsername || '未认证'}`);
@@ -179,6 +180,7 @@ function handleMessage(ws, msg) {
     case 'key_response':
     case 'encrypted':
       const forwarded = router.forward(ws, msg);
+      console.log(`[RELAY] 转发 ${type}: ${ws._mychatDevice} -> ${forwarded ? '成功' : '失败(对端离线)'}`);
       if (!forwarded) {
         // 对端离线，通知发送方
         const targetDevice = ws._mychatDevice === 'mobile' ? 'desktop' : 'mobile';

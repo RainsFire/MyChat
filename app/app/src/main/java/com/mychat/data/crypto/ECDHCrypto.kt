@@ -43,6 +43,9 @@ class ECDHCrypto {
     }
 
     fun completeHandshake(responderPubKey: String) {
+        if (keyPair == null) {
+            throw IllegalStateException("completeHandshake called before initAsInitiator")
+        }
         val theirPubKeyBytes = Base64.getDecoder().decode(responderPubKey)
         val theirPubKey = decompressPublicKey(theirPubKeyBytes)
         computeSharedKey(theirPubKey)

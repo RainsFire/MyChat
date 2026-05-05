@@ -6,7 +6,7 @@
     <string>com.mychat.agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/node</string>
+        <string>/opt/homebrew/bin/node</string>
         <string>/Users/alex/MyChat/agent/agent.js</string>
     </array>
     <key>WorkingDirectory</key>
@@ -14,11 +14,11 @@
     <key>EnvironmentVariables</key>
     <dict>
         <key>MYCHAT_RELAY_URL</key>
-        <string>ws://your-relay-server:9090</string>
+        <string>ws://121.41.103.157:9090</string>
         <key>MYCHAT_USER</key>
-        <string>admin</string>
+        <string>rains2009</string>
         <key>MYCHAT_PASS</key>
-        <string>changeme</string>
+        <string>Listen09%</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>

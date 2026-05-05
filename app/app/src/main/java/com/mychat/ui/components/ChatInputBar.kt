@@ -27,7 +27,7 @@ fun ChatInputBar(
 
     Surface(
         modifier = modifier,
-        shadowElevation = 2.dp
+        color = MaterialTheme.colorScheme.background
     ) {
         Row(
             modifier = Modifier
