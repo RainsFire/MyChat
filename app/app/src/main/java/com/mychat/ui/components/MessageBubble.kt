@@ -3,13 +3,17 @@ package com.mychat.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -36,6 +40,25 @@ fun MessageBubble(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
+    // 选择高亮色：与气泡背景形成对比
+    val selectionColors = if (isUser) {
+        // 用户气泡（primary 背景）→ 用深色高亮
+        remember {
+            TextSelectionColors(
+                handleColor = Color.White,
+                backgroundColor = Color(0x60000000) // 38% 黑色
+            )
+        }
+    } else {
+        // 助手气泡（surfaceVariant 背景）→ 用深色高亮
+        remember {
+            TextSelectionColors(
+                handleColor = Color(0xFF1565C0), // Material blue 800
+                backgroundColor = Color(0x40000000) // 25% 黑色
+            )
+        }
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -57,7 +80,8 @@ fun MessageBubble(
                 .padding(horizontal = 14.dp, vertical = 10.dp)
                 .widthIn(max = 260.dp)
         ) {
-            SelectionContainer {
+            CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+                SelectionContainer {
                 if (isUser) {
                     Text(
                         text = message.content,
@@ -85,6 +109,7 @@ fun MessageBubble(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
+                }
                 }
             }
         }

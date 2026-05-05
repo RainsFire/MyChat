@@ -79,11 +79,13 @@ class ChatViewModel @Inject constructor(
     fun sendPermissionResponse(approved: Boolean) {
         repository.sendPermissionResponse(approved)
         _permissionRequest.value = null
+        NotificationHelper.cancelPermissionNotification(getApplication())
     }
 
     fun sendChoiceResponse(selected: Int) {
         repository.sendChoiceResponse(selected)
         _choiceRequest.value = null
+        NotificationHelper.cancelChoiceNotification(getApplication())
     }
 
     fun sendInterrupt() {
@@ -142,9 +144,15 @@ class ChatViewModel @Inject constructor(
             }
             is RelayEvent.PermissionRequest -> {
                 _permissionRequest.value = event
+                if (!isAppInForeground()) {
+                    NotificationHelper.showPermissionNotification(getApplication(), event.action, event.details)
+                }
             }
             is RelayEvent.ChoiceRequest -> {
                 _choiceRequest.value = event
+                if (!isAppInForeground()) {
+                    NotificationHelper.showChoiceNotification(getApplication(), event.options)
+                }
             }
             is RelayEvent.ModeChanged -> {
                 _currentMode.value = event.mode

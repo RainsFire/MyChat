@@ -80,7 +80,8 @@ MyChat/
 │   └── test/           # 测试
 │       ├── test-relay.js    # 中继服务器测试（22 assertions）
 │       ├── test-e2e.js      # 端到端集成测试（21 assertions）
-│       └── test-timing.js   # 连接时序/重连/心跳/异常测试（31 assertions）
+│       ├── test-timing.js   # 连接时序/重连/心跳/异常测试（31 assertions）
+│       └── test-notification.js # 通知与复合场景测试（47 assertions）
 ├── agent/test/
 │       └── test-session.js  # 会话持久化测试（30 assertions）
 └── app/                # Android 应用
@@ -101,6 +102,9 @@ node relay/test/test-relay.js
 # 端到端集成测试
 node relay/test/test-e2e.js
 
+# 通知与复合场景测试（10个场景）
+node relay/test/test-notification.js
+
 # 连接时序 & 重连 & 心跳 & 异常测试（10个场景）
 node relay/test/test-timing.js
 
@@ -110,10 +114,17 @@ node agent/test/test-agent.js
 # 会话持久化测试（6个场景）
 node agent/test/test-session.js
 
-# 全部运行（128 个断言）
+# 全部运行（151 个断言）
 ```
 
 ## 更新日志
+
+### v1.1 — 通知与 UI 优化
+- NotificationHelper 改进：PendingIntent 点击打开 App、POST_NOTIFICATIONS 权限检查
+- 新增权限确认通知（PermissionRequest）和选择请求通知（ChoiceRequest）
+- App 后台时弹出通知，点击通知直接打开对话界面
+- MessageBubble 文本选择高亮优化：用户/助手气泡使用对比色
+- 补充 10 个通知与复合场景测试（47 assertions，结合连接+会话+通知三重要素）
 
 ### v1.0 — 会话持久化
 - 新增 session.js：Claude CLI session_id 持久化到 ~/.mychat/session.json
