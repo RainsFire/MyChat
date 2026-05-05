@@ -18,6 +18,8 @@ class ClaudeCLI {
     this.mode = 'default';
     this.outputBuffer = '';
     this.isResponding = false;
+    this._pendingText = null;
+    this._retryCount = 0;
   }
 
   start() {}
@@ -25,8 +27,13 @@ class ClaudeCLI {
   sendMessage(text) {
     this._kill();
     this.isResponding = true;
+    this._pendingText = text;
+    this._retryCount = 0;
     this.outputBuffer = '';
+    this._startCli(text);
+  }
 
+  _startCli(text) {
     const args = ['-p', text, '--output-format', 'stream-json', '--verbose'];
     if (this.mode === 'auto') {
       args.push('--dangerously-skip-permissions');
@@ -52,12 +59,26 @@ class ClaudeCLI {
       const t = data.toString().trim();
       if (t.includes('Warning:')) return;
       console.error(`[CLI] stderr: ${t}`);
+      // 检测上下文窗口溢出错误
+      if (t.includes('context window') || t.includes('context limit') || t.includes('max_tokens')) {
+        this._contextOverflowDetected = true;
+      }
     });
 
     this.process.on('close', (code) => {
       console.log(`[CLI] 进程退出: code=${code}`);
       this.process = null;
       if (this.isResponding) {
+        if (code !== 0 && this._retryCount < 2 && this._pendingText) {
+          // CLI 异常退出，可能是上下文溢出，重置会话重试
+          console.log(`[CLI] 异常退出(code=${code})，重置会话并重试(${this._retryCount + 1}/2)`);
+          this.session.clear();
+          this._retryCount++;
+          this.outputBuffer = '';
+          this._startCli(this._pendingText);
+          return;
+        }
+        this._pendingText = null;
         this._finishResponse();
       }
     });
