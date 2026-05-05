@@ -1,5 +1,6 @@
 package com.mychat.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -40,21 +42,21 @@ fun MessageBubble(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    // 选择高亮色：与气泡背景形成对比
+    // 选择高亮色：与气泡背景形成强对比
     val selectionColors = if (isUser) {
-        // 用户气泡（primary 背景）→ 用深色高亮
+        // 用户气泡（深蓝 primary 背景）→ 白色半透明高亮
         remember {
             TextSelectionColors(
                 handleColor = Color.White,
-                backgroundColor = Color(0x60000000) // 38% 黑色
+                backgroundColor = Color(0x80FFFFFF) // 50% 白色
             )
         }
     } else {
-        // 助手气泡（surfaceVariant 背景）→ 用深色高亮
+        // 助手气泡（浅灰背景）→ 深蓝高亮
         remember {
             TextSelectionColors(
-                handleColor = Color(0xFF1565C0), // Material blue 800
-                backgroundColor = Color(0x40000000) // 25% 黑色
+                handleColor = Color(0xFF007AFF),
+                backgroundColor = Color(0x40007AFF) // 25% 蓝色
             )
         }
     }
