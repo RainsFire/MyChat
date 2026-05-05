@@ -19,6 +19,12 @@ android {
         testInstrumentationRunner = "com.mychat.HiltTestRunner"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".sit"
@@ -26,6 +32,7 @@ android {
         }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "DEFAULT_RELAY_URL", "\"${property("RELAY_URL_PROD")}\"")
         }
     }
