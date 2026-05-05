@@ -50,18 +50,46 @@ MYCHAT_RELAY_URL=ws://your-server:9090 MYCHAT_USER=username MYCHAT_PASS=password
 使用 launchctl 开机自启：
 
 ```bash
-cp com.mychat.agent.plist ~/Library/LaunchAgents/
+# 生产环境
+cp agent/com.mychat.agent.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.mychat.agent.plist
+
+# 测试环境（9091 端口）
+cp agent/com.mychat.agent.sit.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.mychat.agent.sit.plist
 ```
 
 ### Android App
 
 ```bash
 cd app
+
+# SIT 测试版（MyChat-SIT，连接 9091 端口）
 ./gradlew assembleDebug
+
+# 生产版（MyChat，连接 9090 端口）
+./gradlew assembleRelease
 ```
 
-APK 输出路径：`app/build/outputs/apk/debug/app-debug.apk`
+APK 输出路径：
+- 测试版：`app/build/outputs/apk/debug/MyChat-SIT-1.0.0.apk`
+- 生产版：`app/build/outputs/apk/release/MyChat-1.0.0.apk`
+
+### 环境配置
+
+Relay 服务器地址在 `app/gradle.properties` 中配置，修改后重新编译即可切换：
+
+```properties
+RELAY_URL_SIT=ws://121.41.103.157:9091
+RELAY_URL_PROD=ws://121.41.103.157:9090
+```
+
+| | SIT (debug) | Production (release) |
+|---|---|---|
+| applicationId | com.mychat.sit | com.mychat |
+| App 名称 | MyChat-SIT | MyChat |
+| 默认 Relay | 9091 端口 | 9090 端口 |
+| 可同时安装 | 是 | 是 |
 
 ## 项目结构
 
@@ -120,6 +148,14 @@ node agent/test/test-session.js
 ```
 
 ## 更新日志
+
+### v1.3 — SIT 测试环境隔离
+- Debug 构建：applicationId=com.mychat.sit，App 名=MyChat-SIT，连接 9091 端口
+- Release 构建：applicationId=com.mychat，连接 9090 端口
+- 两个 APK 可同时安装共存，测试与生产完全隔离
+- Relay URL 配置外置到 gradle.properties，一键切换环境
+- APK 文件名自动区分：MyChat-SIT-1.0.0.apk / MyChat-1.0.0.apk
+- 新增 SIT agent plist（com.mychat.agent.sit）连接测试 relay
 
 ### v1.2 — 后台保活与通知优化
 - 新增 ChatService 前台服务：App 进入后台时自动启动，保持 WebSocket 连接不断
