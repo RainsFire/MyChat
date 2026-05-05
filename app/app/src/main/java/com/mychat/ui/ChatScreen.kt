@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mychat.data.api.ConnectionState
@@ -91,12 +92,29 @@ fun ChatScreen(
             Surface(
                 color = MaterialTheme.colorScheme.background
             ) {
-                ChatInputBar(
-                    isResponding = isResponding,
-                    onSend = { viewModel.sendMessage(it) },
-                    onStop = { viewModel.sendInterrupt() },
-                    modifier = Modifier.navigationBarsPadding()
-                )
+                Column(modifier = Modifier.navigationBarsPadding()) {
+                    // 权限请求内联条
+                    permissionRequest?.let { req ->
+                        PermissionBar(
+                            action = req.action,
+                            details = req.details,
+                            onApprove = { viewModel.sendPermissionResponse(true) },
+                            onDeny = { viewModel.sendPermissionResponse(false) }
+                        )
+                    }
+                    // 选择请求内联条
+                    choiceRequest?.let { req ->
+                        ChoiceBar(
+                            options = req.options,
+                            onSelect = { viewModel.sendChoiceResponse(it) }
+                        )
+                    }
+                    ChatInputBar(
+                        isResponding = isResponding,
+                        onSend = { viewModel.sendMessage(it) },
+                        onStop = { viewModel.sendInterrupt() }
+                    )
+                }
             }
         }
     ) { padding ->
@@ -131,64 +149,6 @@ fun ChatScreen(
                 }
             }
         }
-    }
-
-    // 权限请求对话框
-    permissionRequest?.let { req ->
-        AlertDialog(
-            onDismissRequest = {},
-            modifier = Modifier.testTag("permission_dialog"),
-            title = { Text("权限请求") },
-            text = {
-                Column {
-                    Text("操作: ${req.action}")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(req.details)
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.sendPermissionResponse(true)
-                    },
-                    modifier = Modifier.testTag("permission_approve")
-                ) {
-                    Text("允许")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.sendPermissionResponse(false)
-                    },
-                    modifier = Modifier.testTag("permission_deny")
-                ) {
-                    Text("拒绝")
-                }
-            }
-        )
-    }
-
-    // 选择对话框
-    choiceRequest?.let { req ->
-        AlertDialog(
-            onDismissRequest = {},
-            modifier = Modifier.testTag("choice_dialog"),
-            title = { Text("请选择") },
-            text = {
-                Column {
-                    req.options.forEachIndexed { index, option ->
-                        TextButton(
-                            onClick = { viewModel.sendChoiceResponse(index) },
-                            modifier = Modifier.testTag("choice_option_$index")
-                        ) {
-                            Text(option)
-                        }
-                    }
-                }
-            },
-            confirmButton = {}
-        )
     }
 
     // 设置对话框
@@ -230,5 +190,75 @@ fun ChatScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun PermissionBar(
+    action: String,
+    details: String,
+    onApprove: () -> Unit,
+    onDeny: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .testTag("permission_dialog")
+    ) {
+        Text(
+            text = if (details.isNotEmpty()) "$action: $details" else action,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(
+                onClick = onApprove,
+                modifier = Modifier.testTag("permission_approve"),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                Text("允许", color = MaterialTheme.colorScheme.primary)
+            }
+            TextButton(
+                onClick = onDeny,
+                modifier = Modifier.testTag("permission_deny"),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                Text("拒绝", color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChoiceBar(
+    options: List<String>,
+    onSelect: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .testTag("choice_dialog")
+    ) {
+        options.forEachIndexed { index, option ->
+            TextButton(
+                onClick = { onSelect(index) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("choice_option_$index"),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = option,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
