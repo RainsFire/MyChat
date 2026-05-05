@@ -211,8 +211,23 @@ open class RelayClient {
         val device = RelayProtocol.deviceFromStatus(msg)
         val online = RelayProtocol.isOnline(msg)
         if (device == "desktop") {
+            val wasOnline = _desktopOnline.value
             _desktopOnline.value = online
             AppLogger.i(tag, "desktop ${if (online) "在线" else "离线"}")
+
+            // Desktop 离线时，重置密钥状态（新 desktop 需要重新握手）
+            if (!online && wasOnline && _state.value == ConnectionState.Connected) {
+                AppLogger.i(tag, "desktop 离线，重置密钥状态")
+                ecdh.reset()
+                _state.value = ConnectionState.Handshaking
+            }
+
+            // Desktop 上线且密钥未就绪时，重新发起密钥交换
+            if (online && _state.value == ConnectionState.Handshaking) {
+                AppLogger.i(tag, "desktop 上线，重新发起密钥交换")
+                val pubKey = ecdh.initAsInitiator()
+                webSocket?.send(RelayProtocol.keyInit(pubKey))
+            }
         }
     }
 

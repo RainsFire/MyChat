@@ -1,5 +1,6 @@
 package com.mychat.notification
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -9,7 +10,6 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.mychat.MainActivity
-import com.mychat.R
 
 object NotificationHelper {
     private const val CHANNEL_ID = "chat_reply"
@@ -17,6 +17,7 @@ object NotificationHelper {
     private const val NOTIFICATION_ID_REPLY = 1001
     private const val NOTIFICATION_ID_PERMISSION = 1002
     private const val NOTIFICATION_ID_CHOICE = 1003
+    private const val AUTO_DISMISS_MS = 5000L
 
     fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -27,6 +28,7 @@ object NotificationHelper {
             ).apply {
                 description = "Claude reply notifications"
                 enableVibration(true)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
@@ -42,6 +44,7 @@ object NotificationHelper {
             .setContentText(preview.take(100))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
+            .setTimeoutAfter(AUTO_DISMISS_MS)
             .setContentIntent(pendingIntent)
             .build()
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_REPLY, notification)
@@ -97,7 +100,7 @@ object NotificationHelper {
 
     private fun createPendingIntent(context: Context): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         return PendingIntent.getActivity(
             context,
