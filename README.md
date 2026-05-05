@@ -69,7 +69,8 @@ APK 输出路径：`app/build/outputs/apk/debug/app-debug.apk`
 MyChat/
 ├── agent/              # Mac 桌面客户端
 │   ├── agent.js        # Agent 主程序
-│   ├── claude-cli.js   # Claude CLI 进程管理
+│   ├── claude-cli.js   # Claude CLI 进程管理（会话持久化）
+│   ├── session.js      # 会话 ID 持久化（~/.mychat/session.json）
 │   ├── crypto.js       # 加密模块（ECDH + AES-GCM）
 │   └── store.js        # SQLite 消息存储
 ├── relay/              # WebSocket 中继服务器
@@ -80,6 +81,8 @@ MyChat/
 │       ├── test-relay.js    # 中继服务器测试（22 assertions）
 │       ├── test-e2e.js      # 端到端集成测试（21 assertions）
 │       └── test-timing.js   # 连接时序/重连/心跳/异常测试（31 assertions）
+├── agent/test/
+│       └── test-session.js  # 会话持久化测试（30 assertions）
 └── app/                # Android 应用
     └── app/src/main/java/com/mychat/
         ├── data/
@@ -104,10 +107,20 @@ node relay/test/test-timing.js
 # Mac Agent 测试
 node agent/test/test-agent.js
 
-# 全部运行（98 个断言）
+# 会话持久化测试（6个场景）
+node agent/test/test-session.js
+
+# 全部运行（128 个断言）
 ```
 
 ## 更新日志
+
+### v1.0 — 会话持久化
+- 新增 session.js：Claude CLI session_id 持久化到 ~/.mychat/session.json
+- Agent 重启/崩溃后自动恢复会话上下文（--resume）
+- 多次 CLI 调用更新 session_id 时保留原始 createdAt
+- 损坏 session.json 优雅降级，不导致崩溃
+- 补充 6 个会话持久化测试场景（30 assertions）
 
 ### v0.2 — 连接稳定性增强
 - 修复 relay heartbeat pongTimer 泄漏导致连接被误断

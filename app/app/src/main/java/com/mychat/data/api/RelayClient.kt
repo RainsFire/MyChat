@@ -201,14 +201,6 @@ open class RelayClient {
                 val mode = decrypted.optString("mode", "default")
                 emitEvent(RelayEvent.ModeChanged(mode))
             }
-            "session_reset_ok" -> {
-                emitEvent(RelayEvent.SessionResetOk)
-            }
-            "session_status" -> {
-                val hasSession = decrypted.optBoolean("hasSession", false)
-                val createdAt = decrypted.optLong("createdAt", 0)
-                emitEvent(RelayEvent.SessionStatus(hasSession, createdAt))
-            }
             "crash_log_received" -> {
                 emitEvent(RelayEvent.CrashLogReceived)
             }
@@ -265,18 +257,6 @@ open class RelayClient {
         webSocket?.send(RelayProtocol.ping())
     }
 
-    open fun sendResetSession() {
-        if (!isConnected()) return
-        val payload = aesCipher.encrypt(RelayProtocol.resetSession())
-        webSocket?.send(RelayProtocol.encrypted(payload))
-    }
-
-    open fun sendQuerySessionStatus() {
-        if (!isConnected()) return
-        val payload = aesCipher.encrypt(RelayProtocol.querySessionStatus())
-        webSocket?.send(RelayProtocol.encrypted(payload))
-    }
-
     open fun sendRaw(payload: String) {
         if (!isConnected()) return
         webSocket?.send(RelayProtocol.encrypted(payload))
@@ -305,6 +285,4 @@ sealed class RelayEvent {
     data class ChoiceRequest(val options: List<String>) : RelayEvent()
     data class ModeChanged(val mode: String) : RelayEvent()
     data object CrashLogReceived : RelayEvent()
-    data object SessionResetOk : RelayEvent()
-    data class SessionStatus(val hasSession: Boolean, val createdAt: Long) : RelayEvent()
 }

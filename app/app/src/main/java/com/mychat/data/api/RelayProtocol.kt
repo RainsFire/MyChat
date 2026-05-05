@@ -66,14 +66,6 @@ object RelayProtocol {
         put("mode", mode)
     }.toString()
 
-    fun resetSession(): String = JSONObject().apply {
-        put("type", "reset_session")
-    }.toString()
-
-    fun querySessionStatus(): String = JSONObject().apply {
-        put("type", "query_session_status")
-    }.toString()
-
     // 解析消息类型
     fun messageType(msg: JSONObject): String = msg.optString("type", "")
 

@@ -106,10 +106,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun resetSession() {
-        repository.resetSession()
-    }
-
     private fun loadMessages() {
         viewModelScope.launch {
             repository.loadMessages()
@@ -155,12 +151,6 @@ class ChatViewModel @Inject constructor(
             }
             is RelayEvent.CrashLogReceived -> {
                 AppLogger.i("ChatViewModel", "崩溃日志已接收")
-            }
-            is RelayEvent.SessionResetOk -> {
-                AppLogger.i("ChatViewModel", "会话已重置")
-            }
-            is RelayEvent.SessionStatus -> {
-                AppLogger.i("ChatViewModel", "会话状态: hasSession=${event.hasSession}")
             }
         }
     }
