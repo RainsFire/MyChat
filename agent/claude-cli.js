@@ -147,9 +147,17 @@ class ClaudeCLI {
         if (Array.isArray(content)) {
           for (const block of content) {
             if (block.type === 'text') {
+              // 检测上下文溢出错误，自动重置会话重试
+              if (block.text && (
+                block.text.includes('context window limit') ||
+                block.text.includes('context limit') ||
+                block.text.includes('max_tokens') ||
+                block.text.includes('context window')
+              )) {
+                console.log(`[CLI] 检测到上下文溢出: ${block.text.slice(0, 80)}`);
+                this._contextOverflowDetected = true;
+              }
               this.onReply(block.text);
-            } else if (block.type === 'tool_use') {
-              // 不发送工具调用信息到 app
             }
           }
         }
@@ -157,6 +165,17 @@ class ClaudeCLI {
       if (msg.session_id) this.session.save(msg.session_id);
     } else if (msg.type === 'result') {
       if (msg.session_id) this.session.save(msg.session_id);
+      // 流式输出中检测到上下文溢出，重置会话重试
+      if (this._contextOverflowDetected && this._retryCount < 2 && this._pendingText) {
+        console.log(`[CLI] 上下文溢出，重置会话并重试(${this._retryCount + 1}/2)`);
+        this._contextOverflowDetected = false;
+        this.session.clear();
+        this._retryCount++;
+        this.outputBuffer = '';
+        this._kill();
+        this._startCli(this._pendingText);
+        return;
+      }
       this._finishResponse();
     } else if (msg.type === 'system') {
       if (msg.session_id) this.session.save(msg.session_id);
