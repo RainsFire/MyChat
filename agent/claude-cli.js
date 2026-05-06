@@ -2,6 +2,7 @@
  * Claude CLI 进程管理
  * 每条消息用 claude -p "text" --output-format stream-json --verbose
  * 非交互模式，适合 pipe 环境
+ * CLI 内部自动管理上下文压缩
  */
 
 const { spawn } = require('child_process');
@@ -18,6 +19,9 @@ class ClaudeCLI {
     this.mode = 'default';
     this.outputBuffer = '';
     this.isResponding = false;
+    this._pendingText = null;
+    this._retryCount = 0;
+    this._contextOverflowDetected = false;
   }
 
   start() {}
@@ -25,8 +29,14 @@ class ClaudeCLI {
   sendMessage(text) {
     this._kill();
     this.isResponding = true;
+    this._pendingText = text;
+    this._retryCount = 0;
+    this._contextOverflowDetected = false;
     this.outputBuffer = '';
+    this._startCli(text);
+  }
 
+  _startCli(text) {
     const args = ['-p', text, '--output-format', 'stream-json', '--verbose'];
     if (this.mode === 'auto') {
       args.push('--dangerously-skip-permissions');
@@ -52,12 +62,24 @@ class ClaudeCLI {
       const t = data.toString().trim();
       if (t.includes('Warning:')) return;
       console.error(`[CLI] stderr: ${t}`);
+      if (t.includes('context window') || t.includes('context limit') || t.includes('max_tokens')) {
+        this._contextOverflowDetected = true;
+      }
     });
 
     this.process.on('close', (code) => {
       console.log(`[CLI] 进程退出: code=${code}`);
       this.process = null;
       if (this.isResponding) {
+        if (code !== 0 && this._retryCount < 2 && this._pendingText) {
+          console.log(`[CLI] 异常退出(code=${code})，重置会话并重试(${this._retryCount + 1}/2)`);
+          this.session.clear();
+          this._retryCount++;
+          this.outputBuffer = '';
+          this._startCli(this._pendingText);
+          return;
+        }
+        this._pendingText = null;
         this._finishResponse();
       }
     });
@@ -126,9 +148,17 @@ class ClaudeCLI {
         if (Array.isArray(content)) {
           for (const block of content) {
             if (block.type === 'text') {
+              // 检测上下文溢出错误（CLI 可能以 exit code 0 正常返回错误文本）
+              if (block.text && (
+                block.text.includes('context window limit') ||
+                block.text.includes('context limit') ||
+                block.text.includes('max_tokens') ||
+                block.text.includes('context window')
+              )) {
+                console.log(`[CLI] 检测到上下文溢出: ${block.text.slice(0, 80)}`);
+                this._contextOverflowDetected = true;
+              }
               this.onReply(block.text);
-            } else if (block.type === 'tool_use') {
-              // 不发送工具调用信息到 app
             }
           }
         }
@@ -136,6 +166,17 @@ class ClaudeCLI {
       if (msg.session_id) this.session.save(msg.session_id);
     } else if (msg.type === 'result') {
       if (msg.session_id) this.session.save(msg.session_id);
+      // 流式输出中检测到上下文溢出，重置会话重试
+      if (this._contextOverflowDetected && this._retryCount < 2 && this._pendingText) {
+        console.log(`[CLI] 上下文溢出，重置会话并重试(${this._retryCount + 1}/2)`);
+        this._contextOverflowDetected = false;
+        this.session.clear();
+        this._retryCount++;
+        this.outputBuffer = '';
+        this._kill();
+        this._startCli(this._pendingText);
+        return;
+      }
       this._finishResponse();
     } else if (msg.type === 'system') {
       if (msg.session_id) this.session.save(msg.session_id);
