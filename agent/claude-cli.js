@@ -2,6 +2,7 @@
  * Claude CLI 进程管理
  * 每条消息用 claude -p "text" --output-format stream-json --verbose
  * 非交互模式，适合 pipe 环境
+ * CLI 内部自动管理上下文压缩
  */
 
 const { spawn } = require('child_process');
@@ -20,6 +21,7 @@ class ClaudeCLI {
     this.isResponding = false;
     this._pendingText = null;
     this._retryCount = 0;
+    this._contextOverflowDetected = false;
   }
 
   start() {}
@@ -29,6 +31,7 @@ class ClaudeCLI {
     this.isResponding = true;
     this._pendingText = text;
     this._retryCount = 0;
+    this._contextOverflowDetected = false;
     this.outputBuffer = '';
     this._startCli(text);
   }
@@ -59,7 +62,6 @@ class ClaudeCLI {
       const t = data.toString().trim();
       if (t.includes('Warning:')) return;
       console.error(`[CLI] stderr: ${t}`);
-      // 检测上下文窗口溢出错误
       if (t.includes('context window') || t.includes('context limit') || t.includes('max_tokens')) {
         this._contextOverflowDetected = true;
       }
@@ -70,7 +72,6 @@ class ClaudeCLI {
       this.process = null;
       if (this.isResponding) {
         if (code !== 0 && this._retryCount < 2 && this._pendingText) {
-          // CLI 异常退出，可能是上下文溢出，重置会话重试
           console.log(`[CLI] 异常退出(code=${code})，重置会话并重试(${this._retryCount + 1}/2)`);
           this.session.clear();
           this._retryCount++;
@@ -147,7 +148,7 @@ class ClaudeCLI {
         if (Array.isArray(content)) {
           for (const block of content) {
             if (block.type === 'text') {
-              // 检测上下文溢出错误，自动重置会话重试
+              // 检测上下文溢出错误（CLI 可能以 exit code 0 正常返回错误文本）
               if (block.text && (
                 block.text.includes('context window limit') ||
                 block.text.includes('context limit') ||
