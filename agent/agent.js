@@ -42,7 +42,8 @@ class Agent {
   _initCLI() {
     this.cli = new ClaudeCLI(
       // onReply: Claude 输出的文本片段
-      (text) => {        if (!this.crypto.ready || !this.ws || this.ws.readyState !== 1) return;
+      (text) => {
+        if (!this.crypto.ready || !this.ws || this.ws.readyState !== 1) return;
         const payload = this.crypto.encrypt({
           type: 'chat_reply',
           content: text
@@ -190,7 +191,8 @@ class Agent {
    * 处理 key_init（手机端发起的握手）
    */
   _handleKeyInit(msg) {
-    console.log('[AGENT] 收到密钥握手请求');
+    console.log(`[AGENT] 收到 key_init`);
+    // 始终响应最新的 key_init，确保密钥匹配
     const myPubKey = this.crypto.initAsResponder(msg.publicKey);
 
     this.ws.send(JSON.stringify({
@@ -344,6 +346,13 @@ class Agent {
 }
 
 const path = require('path');
+
+// 给 console.log 加时间戳
+const origLog = console.log;
+const origErr = console.error;
+function ts() { return new Date().toISOString().slice(11, 23); }
+console.log = (...args) => origLog(`[${ts()}]`, ...args);
+console.error = (...args) => origErr(`[${ts()}]`, ...args);
 
 // 启动
 const agent = new Agent();
