@@ -110,6 +110,53 @@ AndroidManifest 配置 `android:usesCleartextTraffic="true"`，并添加 `networ
 - 文件发送/接收
 - 会话列表/多会话管理
 
+### 1.7 待办功能（已评估）
+
+#### 通用二进制分块传输协议（基础设施）
+
+所有文件类传输共用统一传输层，分块（64KB）走现有 `encrypted` 加密通道，Relay 服务器无需改动。
+
+协议流程：`file_transfer_start` → `file_transfer_chunk`（循环）→ `file_transfer_complete` → `file_transfer_ack`
+
+| 组件 | 改动 |
+|------|------|
+| RelayProtocol.kt | 新增 4 个协议函数（start/chunk/complete/ack） |
+| RelayClient.kt | 新增 sendFile() / onFileReceived 回调 |
+| FileTransfer.kt（新） | 分块、拼装、校验、进度回调 |
+| Agent agent.js | 处理 file_transfer 消息，保存文件到磁盘 |
+| MessageEntity | 新增 contentType（text/image/file）和 filePath 字段 |
+
+#### 待办 1：图片识别（P0，独立功能）
+
+App 选择/拍摄图片 → base64 加密发送给 Mac → Agent 保存为文件 → 将路径传给 Claude CLI 识别 → 结果返回 App。
+
+- 不走分块传输层，走独立轻量逻辑
+- App 端：图片选择器 + base64 编码发送
+- Mac 端：保存文件 + 把路径作为消息发给 Claude CLI
+
+#### 待办 2：传输层 + 自动更新（P1）
+
+- Phase 1：实现 FileTransfer 分块传输协议 + Agent 端接收保存
+- Phase 2：自动更新 — App 启动检查版本 → 请求 Mac 发 APK → 下载安装
+- Mac 端放 APK 文件，App 通过传输层下载后调用系统安装器
+- 需新增 `REQUEST_INSTALL_PACKAGES` 权限 + FileProvider 配置
+
+#### 待办 3：图片传输（P2，双向）
+
+复用传输层。App/Mac 互相发送图片文件 → 接收端保存 → 聊天气泡展示。
+
+- App 端：相册/拍照 → 压缩 → 分块传输
+- Mac 端：接收保存 → 聊天气泡展示
+- UI：图片气泡 + 缩略图
+
+#### 待办 4：文件传输（P3，双向）
+
+复用传输层。App/Mac 互相发送任意文件 → 接收端保存 → 文件卡片展示。
+
+- App 端：文件选择器 → 分块传输
+- Mac 端：接收保存到指定目录
+- UI：文件卡片（文件名、大小、类型）
+
 ---
 
 ## 第二部分：设计架构 & 方案（用户阅读版）
@@ -602,7 +649,13 @@ log.error() → console.error() → EPIPE → uncaughtException → log.error() 
 | 日志单文件大小限制 | 2026-05-03 日志膨胀至 22GB 证明按天滚动不够，必须加单文件上限（如 100MB） |
 | 系统消息气泡 | 状态栏 + Snackbar 替代，更简单直观 |
 
-### 5.4 后期扩展注意事项
+### 5.4 待修复问题
+
+| 问题 | 描述 | 优先级 | 状态 |
+|------|------|--------|------|
+| App 切后台未收到回复 | App 切出去后，PC 端回复了，但 App 端没有收到通知或消息 | P0 | 待修复 |
+
+### 5.5 后期扩展注意事项
 
 | 扩展功能 | 设计预留 | 后期实现注意 |
 |---------|---------|-------------|
