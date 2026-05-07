@@ -109,7 +109,7 @@ MyChat/
 │       ├── test-relay.js    # 中继服务器测试（22 assertions）
 │       ├── test-e2e.js      # 端到端集成测试（21 assertions）
 │       ├── test-timing.js   # 连接时序/重连/心跳/异常测试（31 assertions）
-│       └── test-notification.js # 通知与复合场景测试（70 assertions）
+│       └── test-notification.js # 通知与复合场景测试（77 assertions）
 ├── agent/test/
 │       └── test-session.js  # 会话持久化测试（30 assertions）
 └── app/                # Android 应用
@@ -132,7 +132,7 @@ node relay/test/test-relay.js
 # 端到端集成测试
 node relay/test/test-e2e.js
 
-# 通知与复合场景测试（10个场景）
+# 通知与复合场景测试（19个场景，含9个图片场景）
 node relay/test/test-notification.js
 
 # 连接时序 & 重连 & 心跳 & 异常测试（10个场景）
@@ -144,7 +144,7 @@ node agent/test/test-agent.js
 # 会话持久化测试（6个场景）
 node agent/test/test-session.js
 
-# 全部运行（174 个断言）
+# 全部运行（181 个断言）
 ```
 
 ## 更新日志
@@ -156,7 +156,7 @@ node agent/test/test-session.js
 - Claude 使用 Read 工具读取图片文件，分析结果通过 chat_reply 返回 App
 - MessageBubble 支持 contentType="image" 显示图片缩略图
 - 协议层新增：imageMessage(imageBase64, text) + image_ack(success)
-- 测试新增 7 个图片场景（20 assertions），总计 70 assertions 全部通过
+- 测试新增 9 个图片场景（27 assertions），总计 77 assertions 全部通过
 
 ### v1.3 — SIT 测试环境隔离
 - Debug 构建：applicationId=com.mychat.sit，App 名=MyChat-SIT，连接 9091 端口

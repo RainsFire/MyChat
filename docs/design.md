@@ -134,7 +134,7 @@ App 选择/拍摄图片 → base64 加密发送给 Mac → Agent 保存为文件
 - App 端：图片选择器 + base64 编码发送（压缩到 1024x1024, JPEG 70%）
 - Mac 端：保存文件到 `~/.mychat/images/` + 把路径作为消息发给 Claude CLI
 - 协议：`image_message` (imageBase64 + text) → `image_ack` (success)
-- 测试：70 个断言全部通过，覆盖加密转发、重连、大图、交错等 17 个场景
+- 测试：77 个断言全部通过，覆盖加密转发、重连、大图、交错等 19 个场景
 
 #### 待办 2：传输层 + 自动更新（P1）
 
