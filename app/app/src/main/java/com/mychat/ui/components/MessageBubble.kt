@@ -1,6 +1,8 @@
 package com.mychat.ui.components
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,7 +17,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -29,6 +32,7 @@ fun MessageBubble(
     modifier: Modifier = Modifier
 ) {
     val isUser = message.role == "user"
+    val isImage = message.contentType == "image"
     val alignment = if (isUser) Arrangement.End else Arrangement.Start
 
     val bgColor = if (isUser) {
@@ -42,21 +46,18 @@ fun MessageBubble(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    // 选择高亮色：与气泡背景形成强对比
     val selectionColors = if (isUser) {
-        // 用户气泡（深蓝 primary 背景）→ 白色半透明高亮
         remember {
             TextSelectionColors(
                 handleColor = Color.White,
-                backgroundColor = Color(0x80FFFFFF) // 50% 白色
+                backgroundColor = Color(0x80FFFFFF)
             )
         }
     } else {
-        // 助手气泡（浅灰背景）→ 深蓝高亮
         remember {
             TextSelectionColors(
                 handleColor = Color(0xFF007AFF),
-                backgroundColor = Color(0x40007AFF) // 25% 蓝色
+                backgroundColor = Color(0x40007AFF)
             )
         }
     }
@@ -79,39 +80,65 @@ fun MessageBubble(
                     )
                 )
                 .background(bgColor)
-                .padding(horizontal = 14.dp, vertical = 10.dp)
+                .padding(horizontal = 4.dp, vertical = 4.dp)
                 .widthIn(max = 260.dp)
         ) {
-            CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
-                SelectionContainer {
-                if (isUser) {
-                    Text(
-                        text = message.content,
-                        color = textColor,
-                        style = MaterialTheme.typography.bodyMedium
+            if (isImage) {
+                val bitmap = remember(message.content) {
+                    val bytes = Base64.decode(message.content, Base64.DEFAULT)
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                }
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "图片",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp)),
+                        contentScale = ContentScale.FillWidth
                     )
                 } else {
-                    if (message.content.length > 20) {
-                        val markdownContent = remember(message.content) { message.content }
-                        MarkdownText(
-                            markdown = markdownContent,
-                            fontSize = 14.sp,
-                            color = textColor,
-                            style = androidx.compose.ui.text.TextStyle(
-                                fontSize = 14.sp,
-                                color = textColor,
-                                fontFamily = FontFamily.Monospace,
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        Text(
-                            text = message.content,
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                    Text(
+                        text = "[图片加载失败]",
+                        color = textColor,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
                 }
+            } else {
+                CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+                    SelectionContainer {
+                        if (isUser) {
+                            Text(
+                                text = message.content,
+                                color = textColor,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        } else {
+                            if (message.content.length > 20) {
+                                val markdownContent = remember(message.content) { message.content }
+                                MarkdownText(
+                                    markdown = markdownContent,
+                                    fontSize = 14.sp,
+                                    color = textColor,
+                                    style = androidx.compose.ui.text.TextStyle(
+                                        fontSize = 14.sp,
+                                        color = textColor,
+                                        fontFamily = FontFamily.Monospace,
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                Text(
+                                    text = message.content,
+                                    color = textColor,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

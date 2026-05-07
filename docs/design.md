@@ -126,13 +126,15 @@ AndroidManifest 配置 `android:usesCleartextTraffic="true"`，并添加 `networ
 | Agent agent.js | 处理 file_transfer 消息，保存文件到磁盘 |
 | MessageEntity | 新增 contentType（text/image/file）和 filePath 字段 |
 
-#### 待办 1：图片识别（P0，独立功能）
+#### 待办 1：图片识别（P0，独立功能）— **v1 已实现**
 
 App 选择/拍摄图片 → base64 加密发送给 Mac → Agent 保存为文件 → 将路径传给 Claude CLI 识别 → 结果返回 App。
 
 - 不走分块传输层，走独立轻量逻辑
-- App 端：图片选择器 + base64 编码发送
-- Mac 端：保存文件 + 把路径作为消息发给 Claude CLI
+- App 端：图片选择器 + base64 编码发送（压缩到 1024x1024, JPEG 70%）
+- Mac 端：保存文件到 `~/.mychat/images/` + 把路径作为消息发给 Claude CLI
+- 协议：`image_message` (imageBase64 + text) → `image_ack` (success)
+- 测试：70 个断言全部通过，覆盖加密转发、重连、大图、交错等 17 个场景
 
 #### 待办 2：传输层 + 自动更新（P1）
 

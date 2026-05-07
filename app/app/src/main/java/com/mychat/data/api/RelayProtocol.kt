@@ -47,6 +47,12 @@ object RelayProtocol {
         put("content", content)
     }.toString()
 
+    fun imageMessage(imageBase64: String, text: String): String = JSONObject().apply {
+        put("type", "image_message")
+        put("imageBase64", imageBase64)
+        put("text", text)
+    }.toString()
+
     fun permissionResponse(approved: Boolean): String = JSONObject().apply {
         put("type", "permission_response")
         put("response", if (approved) "approve" else "deny")

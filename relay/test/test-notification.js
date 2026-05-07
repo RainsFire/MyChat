@@ -582,6 +582,664 @@ async function test_threeElementsCompound() {
 }
 
 // =====================================================
+// 场景 11: image_message 加密转发完整流程
+// =====================================================
+
+async function test_imageMessage_encryptedFlow() {
+  console.log('[测试] 场景11: image_message 加密转发完整流程');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  const fakeBase64 = Buffer.from('fake-image-data-for-testing').toString('base64');
+  encryptSend(mobile, mobileCrypto, {
+    type: 'image_message',
+    imageBase64: fakeBase64,
+    text: '请分析这张图片'
+  });
+
+  const received = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  assert(received.type === 'image_message', '场景11: desktop 收到 image_message');
+  assert(received.imageBase64 === fakeBase64, '场景11: imageBase64 完整无损');
+  assert(received.text === '请分析这张图片', '场景11: text 正确');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 12: image_ack 确认回传
+// =====================================================
+
+async function test_imageAck_roundTrip() {
+  console.log('[测试] 场景12: image_ack 确认回传');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  const fakeBase64 = Buffer.from('test-image').toString('base64');
+  encryptSend(mobile, mobileCrypto, {
+    type: 'image_message',
+    imageBase64: fakeBase64,
+    text: ''
+  });
+
+  const imgMsg = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  assert(imgMsg.type === 'image_message', '场景12: desktop 收到 image_message');
+
+  encryptSend(desktop, desktopCrypto, { type: 'image_ack', success: true });
+
+  const ack = await decryptNext(mobile, mobileCrypto, 'encrypted');
+  assert(ack.type === 'image_ack', '场景12: mobile 收到 image_ack');
+  assert(ack.success === true, '场景12: success 为 true');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 13: image_message 与 chat_message 交错
+// =====================================================
+
+async function test_imageAndChat_interleaved() {
+  console.log('[测试] 场景13: image_message 与 chat_message 交错');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  const fakeBase64 = Buffer.from('interleaved-image').toString('base64');
+
+  encryptSend(mobile, mobileCrypto, { type: 'chat_message', content: '第一条文本' });
+  encryptSend(mobile, mobileCrypto, { type: 'image_message', imageBase64: fakeBase64, text: '第二张图' });
+  encryptSend(mobile, mobileCrypto, { type: 'chat_message', content: '第三条文本' });
+
+  const msgs = [];
+  for (let i = 0; i < 3; i++) {
+    msgs.push(await decryptNext(desktop, desktopCrypto, 'encrypted'));
+  }
+
+  assert(msgs[0].type === 'chat_message' && msgs[0].content === '第一条文本', '场景13: 第一条 chat_message 正确');
+  assert(msgs[1].type === 'image_message' && msgs[1].text === '第二张图', '场景13: image_message 正确');
+  assert(msgs[2].type === 'chat_message' && msgs[2].content === '第三条文本', '场景13: 第三条 chat_message 正确');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 14: 纯图片无文字
+// =====================================================
+
+async function test_imageMessage_noText() {
+  console.log('[测试] 场景14: 纯图片无文字');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  const fakeBase64 = Buffer.from('image-no-text').toString('base64');
+  encryptSend(mobile, mobileCrypto, {
+    type: 'image_message',
+    imageBase64: fakeBase64,
+    text: ''
+  });
+
+  const received = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  assert(received.type === 'image_message', '场景14: desktop 收到 image_message');
+  assert(received.text === '', '场景14: text 为空字符串');
+  assert(received.imageBase64 === fakeBase64, '场景14: base64 完整');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 15: 超大 base64 (>5MB 模拟)
+// =====================================================
+
+async function test_imageMessage_largeBase64() {
+  console.log('[测试] 场景15: 超大 base64 (>5MB 模拟)');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  const largeData = 'A'.repeat(6 * 1024 * 1024);
+  const largeBase64 = Buffer.from(largeData).toString('base64');
+
+  encryptSend(mobile, mobileCrypto, {
+    type: 'image_message',
+    imageBase64: largeBase64,
+    text: '大图测试'
+  });
+
+  const received = await decryptNext(desktop, desktopCrypto, 'encrypted', 10000);
+  assert(received.type === 'image_message', '场景15: desktop 收到 image_message');
+  assert(received.imageBase64 === largeBase64, '场景15: 大数据完整无损');
+  assert(received.imageBase64.length === largeBase64.length, '场景15: 长度一致');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 16: mobile 重连后发图片
+// =====================================================
+
+async function test_mobileReconnect_thenSendImage() {
+  console.log('[测试] 场景16: mobile 重连后发图片');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto: crypto1, desktopCrypto: dCrypto1 } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  mobile.close();
+  await delay(300);
+
+  const mobile2 = await wsConnect();
+  await auth(mobile2, 'mobile');
+  await delay(100);
+
+  await nextMsg(desktop, 'device_status', 2000);
+
+  const { mobileCrypto: crypto2, desktopCrypto: dCrypto2 } = await doKeyExchange(mobile2, desktop);
+  await delay(100);
+
+  const fakeBase64 = Buffer.from('reconnect-image').toString('base64');
+  encryptSend(mobile2, crypto2, {
+    type: 'image_message',
+    imageBase64: fakeBase64,
+    text: '重连后发的图'
+  });
+
+  const received = await decryptNext(desktop, dCrypto2, 'encrypted');
+  assert(received.type === 'image_message', '场景16: 重连后 desktop 收到 image_message');
+  assert(received.imageBase64 === fakeBase64, '场景16: base64 完整');
+
+  mobile2.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 17: 快速连续多张图片
+// =====================================================
+
+async function test_multipleImages_rapidSequence() {
+  console.log('[测试] 场景17: 快速连续多张图片');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  const images = [];
+  for (let i = 0; i < 5; i++) {
+    const b64 = Buffer.from(`image-${i}`).toString('base64');
+    images.push(b64);
+    encryptSend(mobile, mobileCrypto, {
+      type: 'image_message',
+      imageBase64: b64,
+      text: `第${i + 1}张`
+    });
+  }
+
+  for (let i = 0; i < 5; i++) {
+    const msg = await decryptNext(desktop, desktopCrypto, 'encrypted');
+    assert(msg.type === 'image_message', `场景17: 第${i + 1}张类型正确`);
+    assert(msg.imageBase64 === images[i], `场景17: 第${i + 1}张数据正确`);
+  }
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 18: chat + image + permission 三重并发
+// =====================================================
+
+async function test_chatImagePermission_concurrent() {
+  console.log('[测试] 场景18: chat + image + permission 三重并发');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  const fakeBase64 = Buffer.from('concurrent-img').toString('base64');
+
+  encryptSend(mobile, mobileCrypto, { type: 'chat_message', content: '文本消息' });
+  encryptSend(mobile, mobileCrypto, { type: 'image_message', imageBase64: fakeBase64, text: '图片消息' });
+  encryptSend(desktop, desktopCrypto, { type: 'chat_reply', content: '回复' });
+  encryptSend(desktop, desktopCrypto, { type: 'permission_request', action: 'read', details: 'file.txt' });
+  encryptSend(desktop, desktopCrypto, { type: 'image_ack', success: true });
+
+  const msg1 = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  const msg2 = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  assert(msg1.type === 'chat_message', '场景18: desktop 收到 chat_message');
+  assert(msg2.type === 'image_message', '场景18: desktop 收到 image_message');
+
+  const msgs = [];
+  for (let i = 0; i < 3; i++) {
+    msgs.push(await decryptNext(mobile, mobileCrypto, 'encrypted'));
+  }
+  const types = msgs.map(m => m.type);
+  assert(types.includes('chat_reply'), '场景18: mobile 收到 chat_reply');
+  assert(types.includes('permission_request'), '场景18: mobile 收到 permission_request');
+  assert(types.includes('image_ack'), '场景18: mobile 收到 image_ack');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 19: desktop 重连后发送 image_ack
+// =====================================================
+
+async function test_desktopReconnect_thenImageAck() {
+  console.log('[测试] 场景19: desktop 重连后发送 image_ack');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto: mCrypto1, desktopCrypto: dCrypto1 } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  await nextMsg(mobile, 'device_status', 2000);
+
+  desktop.close();
+  await delay(300);
+
+  await nextMsg(mobile, 'device_status', 2000);
+
+  const desktop2 = await wsConnect();
+  await auth(desktop2, 'desktop');
+  await delay(100);
+
+  await nextMsg(mobile, 'device_status', 2000);
+
+  const { mobileCrypto: mCrypto2, desktopCrypto: dCrypto2 } = await doKeyExchange(mobile, desktop2);
+  await delay(100);
+
+  const fakeBase64 = Buffer.from('after-reconnect').toString('base64');
+  encryptSend(mobile, mCrypto2, {
+    type: 'image_message',
+    imageBase64: fakeBase64,
+    text: '重连后测试'
+  });
+
+  const imgMsg = await decryptNext(desktop2, dCrypto2, 'encrypted');
+  assert(imgMsg.type === 'image_message', '场景19: desktop 重连后收到 image_message');
+
+  encryptSend(desktop2, dCrypto2, { type: 'image_ack', success: true });
+  const ack = await decryptNext(mobile, mCrypto2, 'encrypted');
+  assert(ack.type === 'image_ack' && ack.success === true, '场景19: mobile 收到 image_ack');
+
+  mobile.close();
+  desktop2.close();
+}
+
+// =====================================================
+// 场景 11: image_message 加密转发
+// =====================================================
+
+async function test_imageMessage_encryptedFlow() {
+  console.log('[测试] 场景11: image_message 加密转发');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  // 生成模拟 base64 图片数据（1x1 JPEG 最小合法数据）
+  const fakeBase64 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AKwA//9k=';
+
+  encryptSend(mobile, mobileCrypto, {
+    type: 'image_message',
+    imageBase64: fakeBase64,
+    text: '这是什么图片？'
+  });
+
+  const received = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  assert(received.type === 'image_message', '场景11: desktop 收到 image_message');
+  assert(received.imageBase64 === fakeBase64, '场景11: imageBase64 完整无损');
+  assert(received.text === '这是什么图片？', '场景11: text 正确');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 12: image_message 纯图片无文字
+// =====================================================
+
+async function test_imageMessage_noText() {
+  console.log('[测试] 场景12: image_message 纯图片无文字');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  const fakeBase64 = 'dGVzdF9pbWFnZV9iYXNlNjQ=';
+  encryptSend(mobile, mobileCrypto, {
+    type: 'image_message',
+    imageBase64: fakeBase64,
+    text: ''
+  });
+
+  const received = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  assert(received.type === 'image_message', '场景12: desktop 收到 image_message');
+  assert(received.text === '', '场景12: text 为空不崩溃');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 13: image_message 与 chat_message 交错
+// =====================================================
+
+async function test_imageMessage_interleavedWithChat() {
+  console.log('[测试] 场景13: image_message 与 chat_message 交错');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  encryptSend(mobile, mobileCrypto, { type: 'chat_message', content: '你好' });
+  encryptSend(mobile, mobileCrypto, { type: 'image_message', imageBase64: 'aW1hZ2U=', text: '看这个' });
+  encryptSend(mobile, mobileCrypto, { type: 'chat_message', content: '分析一下' });
+
+  const msg1 = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  const msg2 = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  const msg3 = await decryptNext(desktop, desktopCrypto, 'encrypted');
+
+  assert(msg1.type === 'chat_message', '场景13: 第1条是 chat_message');
+  assert(msg2.type === 'image_message', '场景13: 第2条是 image_message');
+  assert(msg2.imageBase64 === 'aW1hZ2U=', '场景13: imageBase64 正确');
+  assert(msg3.type === 'chat_message', '场景13: 第3条是 chat_message');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 14: 大体积 image_message (>1MB base64)
+// =====================================================
+
+async function test_imageMessage_largePayload() {
+  console.log('[测试] 场景14: 大体积 image_message (>1MB base64)');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  // 生成约 1.5MB 的 base64 数据
+  const largeBase64 = 'A'.repeat(1.5 * 1024 * 1024);
+  encryptSend(mobile, mobileCrypto, {
+    type: 'image_message',
+    imageBase64: largeBase64,
+    text: '大图测试'
+  });
+
+  const received = await decryptNext(desktop, desktopCrypto, 'encrypted', 10000);
+  assert(received.type === 'image_message', '场景14: desktop 收到大体积 image_message');
+  assert(received.imageBase64.length === largeBase64.length, '场景14: base64 长度一致，无截断');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 15: image_message mobile 重连后发送
+// =====================================================
+
+async function test_imageMessage_afterReconnect() {
+  console.log('[测试] 场景15: image_message mobile 重连后发送');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto: crypto1, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  // 先发一条普通消息
+  encryptSend(mobile, crypto1, { type: 'chat_message', content: '第一条消息' });
+  await decryptNext(desktop, desktopCrypto, 'encrypted');
+
+  // Mobile 断开重连
+  mobile.close();
+  await delay(300);
+
+  const mobile2 = await wsConnect();
+  await auth(mobile2, 'mobile');
+  await nextMsg(desktop, 'device_status', 2000);
+
+  const { mobileCrypto: crypto2, desktopCrypto: desktopCrypto2 } = await doKeyExchange(mobile2, desktop);
+  await delay(100);
+
+  // 重连后发图片
+  encryptSend(mobile2, crypto2, {
+    type: 'image_message',
+    imageBase64: 'cmVjb25uZWN0X2ltYWdl',
+    text: '重连后发的图'
+  });
+
+  const received = await decryptNext(desktop, desktopCrypto2, 'encrypted');
+  assert(received.type === 'image_message', '场景15: 重连后 desktop 收到 image_message');
+  assert(received.text === '重连后发的图', '场景15: text 正确');
+
+  mobile2.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 16: image_ack 回传确认
+// =====================================================
+
+async function test_imageAck_roundTrip() {
+  console.log('[测试] 场景16: image_ack 回传确认');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  // Desktop 发送 image_ack
+  encryptSend(desktop, desktopCrypto, { type: 'image_ack', success: true });
+
+  const received = await decryptNext(mobile, mobileCrypto, 'encrypted');
+  assert(received.type === 'image_ack', '场景16: mobile 收到 image_ack');
+  assert(received.success === true, '场景16: success 为 true');
+
+  // 测试失败 ack
+  encryptSend(desktop, desktopCrypto, { type: 'image_ack', success: false });
+  const received2 = await decryptNext(mobile, mobileCrypto, 'encrypted');
+  assert(received2.type === 'image_ack', '场景16: mobile 收到失败 image_ack');
+  assert(received2.success === false, '场景16: success 为 false');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 17: 连续多张图片
+// =====================================================
+
+async function test_imageMessage_multipleImages() {
+  console.log('[测试] 场景17: 连续多张图片');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  for (let i = 0; i < 3; i++) {
+    encryptSend(mobile, mobileCrypto, {
+      type: 'image_message',
+      imageBase64: `aW1hZ2Vf${i}`,
+      text: `图片${i + 1}`
+    });
+  }
+
+  for (let i = 0; i < 3; i++) {
+    const received = await decryptNext(desktop, desktopCrypto, 'encrypted');
+    assert(received.type === 'image_message', `场景17: 第${i + 1}张图片收到`);
+    assert(received.text === `图片${i + 1}`, `场景17: 第${i + 1}张 text 正确`);
+  }
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 18: chat + image + permission 三重并发
+// =====================================================
+
+async function test_chatImagePermission_concurrent() {
+  console.log('[测试] 场景18: chat + image + permission 三重并发');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto, desktopCrypto } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  const fakeBase64 = Buffer.from('concurrent-img').toString('base64');
+
+  encryptSend(mobile, mobileCrypto, { type: 'chat_message', content: '文本消息' });
+  encryptSend(mobile, mobileCrypto, { type: 'image_message', imageBase64: fakeBase64, text: '图片消息' });
+  encryptSend(desktop, desktopCrypto, { type: 'chat_reply', content: '回复' });
+  encryptSend(desktop, desktopCrypto, { type: 'permission_request', action: 'read', details: 'file.txt' });
+  encryptSend(desktop, desktopCrypto, { type: 'image_ack', success: true });
+
+  const msg1 = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  const msg2 = await decryptNext(desktop, desktopCrypto, 'encrypted');
+  assert(msg1.type === 'chat_message', '场景18: desktop 收到 chat_message');
+  assert(msg2.type === 'image_message', '场景18: desktop 收到 image_message');
+
+  const msgs = [];
+  for (let i = 0; i < 3; i++) {
+    msgs.push(await decryptNext(mobile, mobileCrypto, 'encrypted'));
+  }
+  const types = msgs.map(m => m.type);
+  assert(types.includes('chat_reply'), '场景18: mobile 收到 chat_reply');
+  assert(types.includes('permission_request'), '场景18: mobile 收到 permission_request');
+  assert(types.includes('image_ack'), '场景18: mobile 收到 image_ack');
+
+  mobile.close();
+  desktop.close();
+}
+
+// =====================================================
+// 场景 19: desktop 重连后发送 image_ack
+// =====================================================
+
+async function test_desktopReconnect_thenImageAck() {
+  console.log('[测试] 场景19: desktop 重连后发送 image_ack');
+
+  const mobile = await wsConnect();
+  const desktop = await wsConnect();
+  await auth(mobile, 'mobile');
+  await auth(desktop, 'desktop');
+
+  const { mobileCrypto: mCrypto1, desktopCrypto: dCrypto1 } = await doKeyExchange(mobile, desktop);
+  await delay(100);
+
+  await nextMsg(mobile, 'device_status', 2000);
+
+  desktop.close();
+  await delay(300);
+
+  await nextMsg(mobile, 'device_status', 2000);
+
+  const desktop2 = await wsConnect();
+  await auth(desktop2, 'desktop');
+  await delay(100);
+
+  await nextMsg(mobile, 'device_status', 2000);
+
+  const { mobileCrypto: mCrypto2, desktopCrypto: dCrypto2 } = await doKeyExchange(mobile, desktop2);
+  await delay(100);
+
+  const fakeBase64 = Buffer.from('after-reconnect').toString('base64');
+  encryptSend(mobile, mCrypto2, {
+    type: 'image_message',
+    imageBase64: fakeBase64,
+    text: '重连后测试'
+  });
+
+  const imgMsg = await decryptNext(desktop2, dCrypto2, 'encrypted');
+  assert(imgMsg.type === 'image_message', '场景19: desktop 重连后收到 image_message');
+
+  encryptSend(desktop2, dCrypto2, { type: 'image_ack', success: true });
+  const ack = await decryptNext(mobile, mCrypto2, 'encrypted');
+  assert(ack.type === 'image_ack' && ack.success === true, '场景19: mobile 收到 image_ack');
+
+  mobile.close();
+  desktop2.close();
+}
+
+// =====================================================
 
 async function runTests() {
   console.log('\n=== 通知与复合场景测试 ===\n');
@@ -610,6 +1268,16 @@ async function runTests() {
     await test_desktopReconnect_thenSendNotification();
     await test_multipleNotificationsRapidSequence();
     await test_threeElementsCompound();
+    // 图片识别测试
+    await test_imageMessage_encryptedFlow();
+    await test_imageMessage_noText();
+    await test_imageMessage_interleavedWithChat();
+    await test_imageMessage_largePayload();
+    await test_imageMessage_afterReconnect();
+    await test_imageAck_roundTrip();
+    await test_imageMessage_multipleImages();
+    await test_chatImagePermission_concurrent();
+    await test_desktopReconnect_thenImageAck();
   } catch (e) {
     console.error('测试异常:', e);
   }

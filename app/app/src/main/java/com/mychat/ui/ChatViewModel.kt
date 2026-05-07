@@ -105,6 +105,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun sendImageMessage(imageBase64: String, text: String) {
+        viewModelScope.launch {
+            repository.sendImageMessage(imageBase64, text)
+        }
+    }
+
     fun sendPermissionResponse(approved: Boolean) {
         repository.sendPermissionResponse(approved)
         _permissionRequest.value = null
@@ -188,6 +194,9 @@ class ChatViewModel @Inject constructor(
             }
             is RelayEvent.CrashLogReceived -> {
                 AppLogger.i("ChatViewModel", "崩溃日志已接收")
+            }
+            is RelayEvent.ImageAck -> {
+                AppLogger.i("ChatViewModel", "图片消息确认: success=${event.success}")
             }
         }
     }

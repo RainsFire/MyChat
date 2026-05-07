@@ -1,5 +1,12 @@
 package com.mychat.ui
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.net.Uri
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
@@ -19,6 +27,7 @@ import com.mychat.data.api.ConnectionState
 import com.mychat.ui.components.ChatInputBar
 import com.mychat.ui.components.MessageBubble
 import com.mychat.ui.components.StatusBar
+import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +43,19 @@ fun ChatScreen(
     val permissionRequest by viewModel.permissionRequest.collectAsState()
     val choiceRequest by viewModel.choiceRequest.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            val base64 = compressImageToBase64(context, it)
+            if (base64 != null) {
+                viewModel.sendImageMessage(base64, "")
+            }
+        }
+    }
 
     val listState = rememberLazyListState()
     var hasScrolledToBottom by remember { mutableStateOf(false) }
@@ -112,7 +134,8 @@ fun ChatScreen(
                     ChatInputBar(
                         isResponding = isResponding,
                         onSend = { viewModel.sendMessage(it) },
-                        onStop = { viewModel.sendInterrupt() }
+                        onStop = { viewModel.sendInterrupt() },
+                        onImagePick = { imagePickerLauncher.launch("image/*") }
                     )
                 }
             }
@@ -260,5 +283,35 @@ private fun ChoiceBar(
                 )
             }
         }
+    }
+}
+
+private fun compressImageToBase64(context: android.content.Context, uri: Uri): String? {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val bitmap = BitmapFactory.decodeStream(inputStream)
+        inputStream.close()
+        if (bitmap == null) return null
+
+        val maxDim = 1024
+        var w = bitmap.width
+        var h = bitmap.height
+        if (w > maxDim || h > maxDim) {
+            val scale = maxDim.toFloat() / maxOf(w, h)
+            w = (w * scale).toInt()
+            h = (h * scale).toInt()
+        }
+        val scaled = if (w != bitmap.width || h != bitmap.height) {
+            Bitmap.createScaledBitmap(bitmap, w, h, true)
+        } else {
+            bitmap
+        }
+
+        val baos = ByteArrayOutputStream()
+        scaled.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+        val bytes = baos.toByteArray()
+        Base64.encodeToString(bytes, Base64.NO_WRAP)
+    } catch (e: Exception) {
+        null
     }
 }

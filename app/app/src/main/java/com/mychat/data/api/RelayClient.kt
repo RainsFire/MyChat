@@ -204,6 +204,10 @@ open class RelayClient {
             "crash_log_received" -> {
                 emitEvent(RelayEvent.CrashLogReceived)
             }
+            "image_ack" -> {
+                val success = decrypted.optBoolean("success", false)
+                emitEvent(RelayEvent.ImageAck(success))
+            }
         }
     }
 
@@ -235,6 +239,12 @@ open class RelayClient {
     open fun sendChatMessage(content: String) {
         if (!isConnected()) return
         val payload = aesCipher.encrypt(RelayProtocol.chatMessage(content))
+        webSocket?.send(RelayProtocol.encrypted(payload))
+    }
+
+    open fun sendImageMessage(imageBase64: String, text: String) {
+        if (!isConnected()) return
+        val payload = aesCipher.encrypt(RelayProtocol.imageMessage(imageBase64, text))
         webSocket?.send(RelayProtocol.encrypted(payload))
     }
 
@@ -300,4 +310,5 @@ sealed class RelayEvent {
     data class ChoiceRequest(val options: List<String>) : RelayEvent()
     data class ModeChanged(val mode: String) : RelayEvent()
     data object CrashLogReceived : RelayEvent()
+    data class ImageAck(val success: Boolean) : RelayEvent()
 }

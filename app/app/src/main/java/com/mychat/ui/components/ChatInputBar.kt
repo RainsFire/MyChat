@@ -5,13 +5,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -21,6 +21,7 @@ fun ChatInputBar(
     isResponding: Boolean,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
+    onImagePick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var text by remember { mutableStateOf("") }
@@ -35,6 +36,25 @@ fun ChatInputBar(
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.Bottom
         ) {
+            IconButton(
+                onClick = { if (!isResponding) onImagePick() },
+                modifier = Modifier
+                    .testTag("image_pick_button")
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .align(Alignment.CenterVertically),
+                enabled = !isResponding
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Image,
+                    contentDescription = "选择图片",
+                    tint = if (!isResponding) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
             TextField(
                 value = text,
                 onValueChange = { text = it },

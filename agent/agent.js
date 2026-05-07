@@ -236,6 +236,10 @@ class Agent {
         this.cli.sendMessage(data.content);
         break;
 
+      case 'image_message':
+        this._handleImageMessage(data);
+        break;
+
       case 'permission_response':
         this.cli.respondPermission(data.response === 'approve');
         break;
@@ -298,6 +302,43 @@ class Agent {
       default:
         console.log(`[AGENT] 未知加密消息类型: ${data.type}`);
     }
+  }
+
+  /**
+   * 处理图片消息：保存文件，发送给 CLI 分析
+   */
+  _handleImageMessage(data) {
+    const fs = require('fs');
+    const imgDir = path.join(process.env.HOME, '.mychat', 'images');
+    fs.mkdirSync(imgDir, { recursive: true });
+    const imgName = `${Date.now()}.jpg`;
+    const imgPath = path.join(imgDir, imgName);
+
+    try {
+      const buf = Buffer.from(data.imageBase64, 'base64');
+      fs.writeFileSync(imgPath, buf);
+      console.log(`[AGENT] 图片已保存: ${imgPath} (${buf.length} bytes)`);
+    } catch (e) {
+      console.error(`[AGENT] 图片保存失败: ${e.message}`);
+      if (this.crypto.ready && this.ws.readyState === 1) {
+        const payload = this.crypto.encrypt({ type: 'image_ack', success: false });
+        this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
+      }
+      return;
+    }
+
+    // 发送确认
+    if (this.crypto.ready && this.ws.readyState === 1) {
+      const payload = this.crypto.encrypt({ type: 'image_ack', success: true });
+      this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
+    }
+
+    // 发给 CLI 分析
+    this.store.saveMessage('user', data.text || '[图片]');
+    const prompt = data.text
+      ? `${data.text}\n\n用户发送了一张图片，请分析: ${imgPath}`
+      : `用户发送了一张图片，请分析: ${imgPath}`;
+    this.cli.sendMessage(prompt);
   }
 
   /**

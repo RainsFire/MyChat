@@ -76,6 +76,30 @@ class ChatRepository(
     }
 
     /**
+     * 发送图片消息
+     */
+    suspend fun sendImageMessage(imageBase64: String, text: String) {
+        val id = messageDao.insert(
+            MessageEntity(
+                role = "user",
+                content = imageBase64,
+                contentType = "image",
+                status = "pending",
+                createdAt = System.currentTimeMillis()
+            )
+        )
+        refreshMessages()
+
+        if (relayClient.state.value is ConnectionState.Connected) {
+            relayClient.sendImageMessage(imageBase64, text)
+            messageDao.updateStatus(id, "sent")
+            refreshMessages()
+        }
+
+        AppLogger.i(tag, "发送图片消息: base64=${imageBase64.length} chars")
+    }
+
+    /**
      * 发送权限响应
      */
     fun sendPermissionResponse(approved: Boolean) {
@@ -167,6 +191,9 @@ class ChatRepository(
             }
             is RelayEvent.CrashLogReceived -> {
                 AppLogger.d(tag, "崩溃日志已接收")
+            }
+            is RelayEvent.ImageAck -> {
+                AppLogger.d(tag, "图片确认: success=${event.success}")
             }
         }
     }

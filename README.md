@@ -109,7 +109,7 @@ MyChat/
 │       ├── test-relay.js    # 中继服务器测试（22 assertions）
 │       ├── test-e2e.js      # 端到端集成测试（21 assertions）
 │       ├── test-timing.js   # 连接时序/重连/心跳/异常测试（31 assertions）
-│       └── test-notification.js # 通知与复合场景测试（47 assertions）
+│       └── test-notification.js # 通知与复合场景测试（70 assertions）
 ├── agent/test/
 │       └── test-session.js  # 会话持久化测试（30 assertions）
 └── app/                # Android 应用
@@ -144,10 +144,19 @@ node agent/test/test-agent.js
 # 会话持久化测试（6个场景）
 node agent/test/test-session.js
 
-# 全部运行（151 个断言）
+# 全部运行（174 个断言）
 ```
 
 ## 更新日志
+
+### v1.4 — 图片识别
+- App 端新增图片选择按钮（输入栏左侧），支持从相册选择图片
+- 图片压缩：最大 1024x1024，JPEG 70%，base64 编码后加密发送
+- Mac Agent 接收 image_message，保存图片到 ~/.mychat/images/，将路径传给 Claude CLI 分析
+- Claude 使用 Read 工具读取图片文件，分析结果通过 chat_reply 返回 App
+- MessageBubble 支持 contentType="image" 显示图片缩略图
+- 协议层新增：imageMessage(imageBase64, text) + image_ack(success)
+- 测试新增 7 个图片场景（20 assertions），总计 70 assertions 全部通过
 
 ### v1.3 — SIT 测试环境隔离
 - Debug 构建：applicationId=com.mychat.sit，App 名=MyChat-SIT，连接 9091 端口
