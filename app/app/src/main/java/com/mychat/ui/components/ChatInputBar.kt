@@ -5,7 +5,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,14 +41,13 @@ fun ChatInputBar(
                 modifier = Modifier
                     .testTag("image_pick_button")
                     .size(36.dp)
-                    .clip(CircleShape)
                     .align(Alignment.CenterVertically),
                 enabled = !isResponding
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Image,
+                    imageVector = Icons.Outlined.AttachFile,
                     contentDescription = "选择图片",
-                    tint = if (!isResponding) MaterialTheme.colorScheme.primary
+                    tint = if (!isResponding) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
                 )
             }
