@@ -96,8 +96,8 @@ RELAY_URL_PROD=ws://121.41.103.157:9090
 ```
 MyChat/
 ├── agent/              # Mac 桌面客户端
-│   ├── agent.js        # Agent 主程序
-│   ├── claude-cli.js   # Claude CLI 进程管理（会话持久化）
+│   ├── agent.js        # Agent 主程序（消息缓冲 + 环境日志）
+│   ├── claude-cli.js   # Claude CLI 进程管理（会话跟踪 + 模式控制）
 │   ├── session.js      # 会话 ID 持久化（~/.mychat/session.json）
 │   ├── crypto.js       # 加密模块（ECDH + AES-GCM）
 │   └── store.js        # SQLite 消息存储
@@ -111,7 +111,8 @@ MyChat/
 │       ├── test-timing.js   # 连接时序/重连/心跳/异常测试（31 assertions）
 │       └── test-notification.js # 通知与复合场景测试（77 assertions）
 ├── agent/test/
-│       └── test-session.js  # 会话持久化测试（30 assertions）
+│       ├── test-session.js  # 会话持久化测试（30 assertions）
+│       └── test-fixes.js    # Bug 修复验证测试（21 assertions）
 └── app/                # Android 应用
     └── app/src/main/java/com/mychat/
         ├── data/
@@ -148,6 +149,31 @@ node agent/test/test-session.js
 ```
 
 ## 更新日志
+
+### v1.5 — Bug 修复与稳定性增强
+- **Fix 1: 消息缓冲机制**（修复 Bug 2, 9）
+  - Agent 层新增 `pendingMessages` 缓冲区，CLI 输出不再因 WebSocket 断开而静默丢弃
+  - 连接恢复（密钥交换完成）后自动回放缓冲消息
+  - 修复 interrupt 在 CLI 已完成时无法结束 App 等待状态的问题
+  - App 后台收到回复时通知正常弹出（依赖 chat_complete 事件可靠送达）
+- **Fix 2: 会话管理增强**（修复 Bug 1, 3）
+  - 新增 `_resumeSessionId` 跟踪，检测 CLI session_id 变化并通知 App
+  - 上下文溢出重置会话前发送 `session_changed` 通知
+  - App 显示系统消息提示会话状态变化
+  - MessageBubble 新增 `system` 角色消息样式（居中灰色文字）
+- **Fix 3: 模式系统修复**（修复 Bug 7）
+  - 使用 Claude CLI `--permission-mode` 参数控制模式行为
+  - `plan` 模式：`--permission-mode plan`，纯讨论不执行工具
+  - `auto` 模式：`--dangerously-skip-permissions`，跳过所有权限检查
+  - `default` 模式：`--permission-mode default`，CLI 按默认规则处理权限
+  - 新增 `permission_request`/`choice_request` 消息类型处理
+  - `respondPermission`/`respondChoice` 现在写入 CLI stdin
+- **Fix 4: 环境隔离验证**（修复 Bug 10）
+  - `ecosystem.config.json` 新增 SIT relay 配置
+  - Agent 启动日志增加环境信息（MYCHAT_ENV、Session 路径、数据库路径）
+- **新增协议消息**：`session_changed`、`SessionResetOk`
+- **新增 RelayEvent 类型**：`SessionChanged`、`SessionResetOk`
+- 新增 21 个修复验证测试，全量测试（relay 22 + e2e 21 + notification 77 + timing 31 + agent 24 + session 30 + fix 21 = 226 assertions）全部通过
 
 ### v1.4 — 图片识别
 - App 端新增图片选择按钮（输入栏左侧），支持从相册选择图片

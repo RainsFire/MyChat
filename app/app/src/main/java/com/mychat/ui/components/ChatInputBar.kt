@@ -73,8 +73,7 @@ fun ChatInputBar(
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent
                 ),
-                maxLines = 4,
-                enabled = !isResponding
+                maxLines = 4
             )
 
             Spacer(modifier = Modifier.width(6.dp))
@@ -94,28 +93,28 @@ fun ChatInputBar(
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
-            } else {
-                IconButton(
-                    onClick = {
-                        if (text.isNotBlank()) {
-                            onSend(text.trim())
-                            text = ""
-                        }
-                    },
-                    modifier = Modifier
-                        .testTag("send_button")
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .align(Alignment.CenterVertically),
-                    enabled = text.isNotBlank()
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Send,
-                        contentDescription = "发送",
-                        tint = if (text.isNotBlank()) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                    )
-                }
+            }
+
+            IconButton(
+                onClick = {
+                    if (text.isNotBlank()) {
+                        onSend(text.trim())
+                        text = ""
+                    }
+                },
+                modifier = Modifier
+                    .testTag("send_button")
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .align(Alignment.CenterVertically),
+                enabled = text.isNotBlank()
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Send,
+                    contentDescription = "发送",
+                    tint = if (text.isNotBlank()) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                )
             }
         }
     }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.TextSelectionColors
@@ -32,8 +33,26 @@ fun MessageBubble(
     modifier: Modifier = Modifier
 ) {
     val isUser = message.role == "user"
+    val isSystem = message.role == "system"
     val isImage = message.contentType == "image"
     val alignment = if (isUser) Arrangement.End else Arrangement.Start
+
+    // 系统消息居中显示
+    if (isSystem) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp, horizontal = 32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = message.content,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+            )
+        }
+        return
+    }
 
     val bgColor = if (isUser) {
         MaterialTheme.colorScheme.primary

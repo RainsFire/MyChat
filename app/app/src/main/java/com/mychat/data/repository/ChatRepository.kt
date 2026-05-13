@@ -195,6 +195,12 @@ class ChatRepository(
             is RelayEvent.ImageAck -> {
                 AppLogger.d(tag, "图片确认: success=${event.success}")
             }
+            is RelayEvent.SessionChanged -> {
+                AppLogger.d(tag, "会话变化: ${event.sessionId}")
+            }
+            is RelayEvent.SessionResetOk -> {
+                AppLogger.d(tag, "会话已重置")
+            }
         }
     }
 
@@ -206,6 +212,18 @@ class ChatRepository(
         messageDao.insert(
             MessageEntity(
                 role = "assistant",
+                content = content,
+                status = "delivered",
+                createdAt = System.currentTimeMillis()
+            )
+        )
+        refreshMessages()
+    }
+
+    suspend fun saveSystemMessage(content: String) {
+        messageDao.insert(
+            MessageEntity(
+                role = "system",
                 content = content,
                 status = "delivered",
                 createdAt = System.currentTimeMillis()

@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SESSION_DIR = path.join(process.env.HOME, '.mychat');
+const SESSION_DIR = path.join(process.env.HOME, '.mychat', process.env.MYCHAT_ENV || '');
 const SESSION_FILE = path.join(SESSION_DIR, 'session.json');
 
 class Session {

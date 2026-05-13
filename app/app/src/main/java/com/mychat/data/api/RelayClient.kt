@@ -41,6 +41,18 @@ open class RelayClient {
     open val events: StateFlow<RelayEvent?> = _events
 
     private var onEventCallback: ((RelayEvent) -> Unit)? = null
+    private var keyInitSent = false
+
+    // 测试用：消息发送拦截
+    private var testSender: ((String) -> Unit)? = null
+
+    fun setTestWebSocketSender(sender: (String) -> Unit) {
+        testSender = sender
+    }
+
+    private fun sendMsg(msg: String) {
+        testSender?.invoke(msg) ?: webSocket?.send(msg)
+    }
 
     // 自动重连
     private var savedUrl: String = ""
@@ -135,12 +147,13 @@ open class RelayClient {
         }
     }
 
-    private fun handleAuthOk() {
+    fun handleAuthOk() {
         AppLogger.i(tag, "认证成功")
         _state.value = ConnectionState.Handshaking
         // 手机端发起密钥交换
+        keyInitSent = true
         val pubKey = ecdh.initAsInitiator()
-        webSocket?.send(RelayProtocol.keyInit(pubKey))
+        sendMsg(RelayProtocol.keyInit(pubKey))
     }
 
     private fun handleAuthFail(msg: JSONObject) {
@@ -158,7 +171,7 @@ open class RelayClient {
         AppLogger.i(tag, "密钥交换完成 (responder)")
     }
 
-    private fun handleKeyResponse(msg: JSONObject) {
+    fun handleKeyResponse(msg: JSONObject) {
         val theirPubKey = RelayProtocol.publicKey(msg)
         ecdh.completeHandshake(theirPubKey)
         aesCipher.setSharedKey(ecdh.sharedKey())
@@ -208,10 +221,17 @@ open class RelayClient {
                 val success = decrypted.optBoolean("success", false)
                 emitEvent(RelayEvent.ImageAck(success))
             }
+            "session_changed" -> {
+                val sessionId = decrypted.optString("sessionId", "")
+                emitEvent(RelayEvent.SessionChanged(sessionId))
+            }
+            "session_reset_ok" -> {
+                emitEvent(RelayEvent.SessionResetOk)
+            }
         }
     }
 
-    private fun handleDeviceStatus(msg: JSONObject) {
+    fun handleDeviceStatus(msg: JSONObject) {
         val device = RelayProtocol.deviceFromStatus(msg)
         val online = RelayProtocol.isOnline(msg)
         if (device == "desktop") {
@@ -223,14 +243,16 @@ open class RelayClient {
             if (!online && wasOnline && _state.value == ConnectionState.Connected) {
                 AppLogger.i(tag, "desktop 离线，重置密钥状态")
                 ecdh.reset()
+                keyInitSent = false
                 _state.value = ConnectionState.Handshaking
             }
 
-            // Desktop 上线且密钥未就绪时，重新发起密钥交换
-            if (online && _state.value == ConnectionState.Handshaking) {
-                AppLogger.i(tag, "desktop 上线，重新发起密钥交换")
+            // Desktop 上线且密钥未就绪时，仅在未发送过 key_init 时发起
+            if (online && _state.value == ConnectionState.Handshaking && !keyInitSent) {
+                AppLogger.i(tag, "desktop 上线，发起密钥交换")
+                keyInitSent = true
                 val pubKey = ecdh.initAsInitiator()
-                webSocket?.send(RelayProtocol.keyInit(pubKey))
+                sendMsg(RelayProtocol.keyInit(pubKey))
             }
         }
     }
@@ -311,4 +333,6 @@ sealed class RelayEvent {
     data class ModeChanged(val mode: String) : RelayEvent()
     data object CrashLogReceived : RelayEvent()
     data class ImageAck(val success: Boolean) : RelayEvent()
+    data class SessionChanged(val sessionId: String) : RelayEvent()
+    data object SessionResetOk : RelayEvent()
 }

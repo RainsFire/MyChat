@@ -11,6 +11,7 @@ object CredentialStore {
     private const val KEY_USERNAME = "username"
     private const val KEY_PASSWORD = "password"
     private const val KEY_AUTO_LOGIN = "auto_login"
+    private const val KEY_MODE = "current_mode"
 
     private val DEFAULT_URL = BuildConfig.DEFAULT_RELAY_URL
     private const val DEFAULT_USERNAME = "admin"
@@ -61,5 +62,13 @@ object CredentialStore {
 
     fun clearCredentials(context: Context) {
         getPrefs(context).edit().clear().apply()
+    }
+
+    fun saveMode(context: Context, mode: String) {
+        getPrefs(context).edit().putString(KEY_MODE, mode).apply()
+    }
+
+    fun getMode(context: Context): String {
+        return getPrefs(context).getString(KEY_MODE, "default") ?: "default"
     }
 }

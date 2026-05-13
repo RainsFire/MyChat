@@ -9,19 +9,21 @@ const { spawn } = require('child_process');
 const Session = require('./session');
 
 class ClaudeCLI {
-  constructor(onReply, onComplete, onPermissionRequest, onChoiceRequest) {
+  constructor(onReply, onComplete, onPermissionRequest, onChoiceRequest, onSessionChange) {
     this.process = null;
     this.session = new Session();
     this.onReply = onReply;
     this.onComplete = onComplete;
-    this.onPermissionRequest = onPermissionRequest;
-    this.onChoiceRequest = onChoiceRequest;
+    this.onPermissionRequest = onPermissionRequest || (() => {});
+    this.onChoiceRequest = onChoiceRequest || (() => {});
+    this.onSessionChange = onSessionChange || (() => {});
     this.mode = 'default';
     this.outputBuffer = '';
     this.isResponding = false;
     this._pendingText = null;
     this._retryCount = 0;
     this._contextOverflowDetected = false;
+    this._resumeSessionId = null;  // Fix 2: 记录 --resume 使用的 session_id
   }
 
   start() {}
@@ -38,13 +40,22 @@ class ClaudeCLI {
 
   _startCli(text) {
     const args = ['-p', text, '--output-format', 'stream-json', '--verbose'];
-    if (this.mode === 'auto') {
+
+    // Fix 3: 使用 --permission-mode 控制模式行为
+    if (this.mode === 'plan') {
+      args.push('--permission-mode', 'plan');
+    } else if (this.mode === 'auto') {
       args.push('--dangerously-skip-permissions');
+    } else {
+      // default: 不跳过权限检查，CLI 会按默认规则处理
     }
+
     if (this.session.sessionId) {
       args.push('--resume', this.session.sessionId);
+      this._resumeSessionId = this.session.sessionId;
       console.log(`[CLI] 恢复会话: ${this.session.sessionId.slice(0, 8)}...`);
     } else {
+      this._resumeSessionId = null;
       console.log('[CLI] 开始新会话');
     }
 
@@ -72,8 +83,7 @@ class ClaudeCLI {
       this.process = null;
       if (this.isResponding) {
         if (code !== 0 && this._retryCount < 2 && this._pendingText) {
-          console.log(`[CLI] 异常退出(code=${code})，重置会话并重试(${this._retryCount + 1}/2)`);
-          this.session.clear();
+          console.log(`[CLI] 异常退出(code=${code})，保留会话重试(${this._retryCount + 1}/2)`);
           this._retryCount++;
           this.outputBuffer = '';
           this._startCli(this._pendingText);
@@ -101,6 +111,7 @@ class ClaudeCLI {
   }
 
   setMode(mode) {
+    if (!['default', 'auto', 'plan'].includes(mode)) return;
     if (this.mode === mode) return;
     this.mode = mode;
     console.log(`[CLI] 切换模式: ${mode}`);
@@ -112,11 +123,31 @@ class ClaudeCLI {
   }
 
   respondPermission(approved) {
-    console.log(`[CLI] 权限响应(忽略): ${approved ? '允许' : '拒绝'}`);
+    console.log(`[CLI] 权限响应: ${approved ? '允许' : '拒绝'}`);
+    if (this.process && this.process.stdin.writable) {
+      try {
+        this.process.stdin.write(JSON.stringify({
+          type: 'permission_response',
+          approved: approved
+        }) + '\n');
+      } catch (e) {
+        console.error(`[CLI] 写入权限响应失败: ${e.message}`);
+      }
+    }
   }
 
   respondChoice(index) {
-    console.log(`[CLI] 选择响应(忽略): ${index}`);
+    console.log(`[CLI] 选择响应: ${index}`);
+    if (this.process && this.process.stdin.writable) {
+      try {
+        this.process.stdin.write(JSON.stringify({
+          type: 'choice_response',
+          index: index
+        }) + '\n');
+      } catch (e) {
+        console.error(`[CLI] 写入选择响应失败: ${e.message}`);
+      }
+    }
   }
 
   stop() {
@@ -142,13 +173,30 @@ class ClaudeCLI {
   }
 
   _handleJsonMessage(msg) {
+    // Fix 3: 处理权限请求消息
+    if (msg.type === 'permission_request' || msg.type === 'permission') {
+      console.log(`[CLI] 权限请求: ${JSON.stringify(msg).slice(0, 200)}`);
+      this.onPermissionRequest({
+        action: msg.tool_name || msg.action || 'unknown',
+        details: typeof msg.tool_input === 'string' ? msg.tool_input : JSON.stringify(msg.tool_input || msg.details || '')
+      });
+      return;
+    }
+
+    if (msg.type === 'choice_request' || msg.type === 'choice') {
+      console.log(`[CLI] 选择请求: ${JSON.stringify(msg).slice(0, 200)}`);
+      const options = msg.options || [];
+      this.onChoiceRequest(options);
+      return;
+    }
+
     if (msg.type === 'assistant') {
       if (msg.message && msg.message.content) {
         const content = msg.message.content;
         if (Array.isArray(content)) {
           for (const block of content) {
             if (block.type === 'text') {
-              // 检测上下文溢出错误（CLI 可能以 exit code 0 正常返回错误文本）
+              // 检测上下文溢出错误
               if (block.text && (
                 block.text.includes('context window limit') ||
                 block.text.includes('context limit') ||
@@ -163,13 +211,15 @@ class ClaudeCLI {
           }
         }
       }
-      if (msg.session_id) this.session.save(msg.session_id);
+      if (msg.session_id) this._saveSession(msg.session_id);
     } else if (msg.type === 'result') {
-      if (msg.session_id) this.session.save(msg.session_id);
+      if (msg.session_id) this._saveSession(msg.session_id);
       // 流式输出中检测到上下文溢出，重置会话重试
       if (this._contextOverflowDetected && this._retryCount < 2 && this._pendingText) {
         console.log(`[CLI] 上下文溢出，重置会话并重试(${this._retryCount + 1}/2)`);
         this._contextOverflowDetected = false;
+        // Fix 2: 通知会话重置
+        this.onSessionChange('reset');
         this.session.clear();
         this._retryCount++;
         this.outputBuffer = '';
@@ -179,7 +229,21 @@ class ClaudeCLI {
       }
       this._finishResponse();
     } else if (msg.type === 'system') {
-      if (msg.session_id) this.session.save(msg.session_id);
+      if (msg.session_id) this._saveSession(msg.session_id);
+    }
+  }
+
+  /**
+   * Fix 2: 保存 session_id 并检测变化
+   */
+  _saveSession(sessionId) {
+    const prevId = this.session.sessionId;
+    this.session.save(sessionId);
+    // 检测 session_id 变化（非上下文溢出场景）
+    if (this._resumeSessionId && sessionId !== this._resumeSessionId) {
+      console.log(`[CLI] 会话 ID 变化: ${this._resumeSessionId.slice(0, 8)} → ${sessionId.slice(0, 8)}`);
+      this._resumeSessionId = sessionId;
+      this.onSessionChange(sessionId);
     }
   }
 

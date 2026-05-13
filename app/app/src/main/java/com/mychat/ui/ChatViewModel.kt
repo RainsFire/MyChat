@@ -46,6 +46,7 @@ class ChatViewModel @Inject constructor(
 
     init {
         NotificationHelper.createChannel(application)
+        _currentMode.value = CredentialStore.getMode(application)
         loadMessages()
         listenEvents()
         startHeartbeat()
@@ -129,6 +130,7 @@ class ChatViewModel @Inject constructor(
 
     fun setMode(mode: String) {
         _currentMode.value = mode
+        CredentialStore.saveMode(getApplication<Application>(), mode)
         repository.setMode(mode)
     }
 
@@ -172,20 +174,20 @@ class ChatViewModel @Inject constructor(
                         repository.saveAssistantMessage(content)
                     }
                     // App 在后台时弹通知
-                    if (!isAppInForeground()) {
+                    if (!isAppForeground) {
                         NotificationHelper.showReplyNotification(getApplication(), content)
                     }
                 }
             }
             is RelayEvent.PermissionRequest -> {
                 _permissionRequest.value = event
-                if (!isAppInForeground()) {
+                if (!isAppForeground) {
                     NotificationHelper.showPermissionNotification(getApplication(), event.action, event.details)
                 }
             }
             is RelayEvent.ChoiceRequest -> {
                 _choiceRequest.value = event
-                if (!isAppInForeground()) {
+                if (!isAppForeground) {
                     NotificationHelper.showChoiceNotification(getApplication(), event.options)
                 }
             }
@@ -198,16 +200,19 @@ class ChatViewModel @Inject constructor(
             is RelayEvent.ImageAck -> {
                 AppLogger.i("ChatViewModel", "图片消息确认: success=${event.success}")
             }
+            is RelayEvent.SessionChanged -> {
+                AppLogger.i("ChatViewModel", "会话变化: ${event.sessionId}")
+                viewModelScope.launch {
+                    repository.saveSystemMessage("会话上下文已更新")
+                }
+            }
+            is RelayEvent.SessionResetOk -> {
+                AppLogger.i("ChatViewModel", "会话已重置")
+                viewModelScope.launch {
+                    repository.saveSystemMessage("会话已重置，Claude 将从头开始")
+                }
+            }
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun isAppInForeground(): Boolean {
-        val app = getApplication<Application>()
-        val am = app.getSystemService(android.content.Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
-        val processes = am?.runningAppProcesses ?: return false
-        return processes.any {
-            it.processName == app.packageName && it.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
-        }
-    }
 }

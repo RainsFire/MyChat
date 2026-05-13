@@ -24,13 +24,17 @@ class Agent {
     this.reconnectDelay = RECONNECT_BASE;
     this.running = false;
     this.heartbeatTimer = null;
+    this.pendingMessages = []; // Fix 1: 消息缓冲，断连时暂存，重连后回放
   }
 
   /**
    * 启动 agent
    */
   async start() {
-    console.log('[AGENT] MyChat Mac 客户端启动');
+    const env = process.env.MYCHAT_ENV || 'production';
+    console.log(`[AGENT] MyChat Mac 客户端启动 (环境: ${env})`);
+    console.log(`[AGENT] Session 路径: ${path.join(process.env.HOME, '.mychat', process.env.MYCHAT_ENV || '')}`);
+    console.log(`[AGENT] 数据库路径: ${path.join(__dirname, 'data', process.env.MYCHAT_ENV || '')}`);
     this.running = true;
     this._initCLI();
     this._connect();
@@ -41,39 +45,53 @@ class Agent {
    */
   _initCLI() {
     this.cli = new ClaudeCLI(
-      // onReply: Claude 输出的文本片段
+      // onReply: Claude 输出的文本片段（Fix 1: 始终缓冲，连接就绪时发送）
       (text) => {
-        if (!this.crypto.ready || !this.ws || this.ws.readyState !== 1) return;
+        if (!this.crypto.ready) return;
         const payload = this.crypto.encrypt({
           type: 'chat_reply',
           content: text
         });
-        this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
+        this.pendingMessages.push(JSON.stringify({ type: 'encrypted', payload }));
+        this._flushBuffer();
       },
-      // onComplete: Claude 回复结束
+      // onComplete: Claude 回复结束（Fix 1: 缓冲完成标记）
       () => {
-        if (!this.crypto.ready || !this.ws || this.ws.readyState !== 1) return;
+        if (!this.crypto.ready) return;
         const payload = this.crypto.encrypt({ type: 'chat_complete' });
-        this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
+        this.pendingMessages.push(JSON.stringify({ type: 'encrypted', payload }));
+        this._flushBuffer();
       },
       // onPermissionRequest: 权限请求
       (details) => {
-        if (!this.crypto.ready || !this.ws || this.ws.readyState !== 1) return;
+        if (!this.crypto.ready) return;
         const payload = this.crypto.encrypt({
           type: 'permission_request',
           action: details.action || 'unknown',
           details: details.details || ''
         });
-        this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
+        this.pendingMessages.push(JSON.stringify({ type: 'encrypted', payload }));
+        this._flushBuffer();
       },
       // onChoiceRequest: 选择请求
       (options) => {
-        if (!this.crypto.ready || !this.ws || this.ws.readyState !== 1) return;
+        if (!this.crypto.ready) return;
         const payload = this.crypto.encrypt({
           type: 'choice_request',
           options: options
         });
-        this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
+        this.pendingMessages.push(JSON.stringify({ type: 'encrypted', payload }));
+        this._flushBuffer();
+      },
+      // onSessionChange: 会话变化通知（Fix 2）
+      (newSessionId) => {
+        if (!this.crypto.ready) return;
+        const payload = this.crypto.encrypt({
+          type: 'session_changed',
+          sessionId: newSessionId
+        });
+        this.pendingMessages.push(JSON.stringify({ type: 'encrypted', payload }));
+        this._flushBuffer();
       }
     );
   }
@@ -188,11 +206,38 @@ class Agent {
   }
 
   /**
+   * Fix 1: 回放缓冲消息
+   * 当 WebSocket 连接就绪时，将断连期间缓冲的消息全部发送
+   */
+  _flushBuffer() {
+    if (!this.ws || this.ws.readyState !== 1) return;
+    while (this.pendingMessages.length > 0) {
+      const msg = this.pendingMessages.shift();
+      try {
+        this.ws.send(msg);
+      } catch (e) {
+        console.error(`[AGENT] 缓冲消息发送失败: ${e.message}`);
+        this.pendingMessages.unshift(msg); // 放回队列
+        return;
+      }
+    }
+  }
+
+  /**
+   * Fix 1/4: 辅助方法 - 加密并缓冲消息
+   */
+  _sendToBuffer(data) {
+    if (!this.crypto.ready) return;
+    const payload = this.crypto.encrypt(data);
+    this.pendingMessages.push(JSON.stringify({ type: 'encrypted', payload }));
+    this._flushBuffer();
+  }
+
+  /**
    * 处理 key_init（手机端发起的握手）
    */
   _handleKeyInit(msg) {
     console.log(`[AGENT] 收到 key_init`);
-    // 始终响应最新的 key_init，确保密钥匹配
     const myPubKey = this.crypto.initAsResponder(msg.publicKey);
 
     this.ws.send(JSON.stringify({
@@ -201,6 +246,7 @@ class Agent {
     }));
 
     console.log('[AGENT] 密钥交换完成');
+    this._flushBuffer(); // Fix 1: 密钥就绪后立即回放缓冲消息
   }
 
   /**
@@ -209,6 +255,7 @@ class Agent {
   _handleKeyResponse(msg) {
     this.crypto.completeHandshake(msg.publicKey);
     console.log('[AGENT] 密钥交换完成');
+    this._flushBuffer(); // Fix 1: 密钥就绪后立即回放缓冲消息
   }
 
   /**
@@ -250,37 +297,39 @@ class Agent {
 
       case 'interrupt':
         this.cli.interrupt();
+        // Fix 1: 如果 CLI 已完成但完成事件还在缓冲区，确保 chat_complete 被发送
+        // 如果缓冲区为空且 CLI 已不在响应，手动补发 chat_complete
+        if (!this.cli.isResponding) {
+          const hasComplete = this.pendingMessages.some(m => m.includes('chat_complete'));
+          if (!hasComplete && this.crypto.ready) {
+            const payload = this.crypto.encrypt({ type: 'chat_complete' });
+            this.pendingMessages.push(JSON.stringify({ type: 'encrypted', payload }));
+            this._flushBuffer();
+          } else {
+            this._flushBuffer();
+          }
+        }
         break;
 
       case 'set_mode':
         this.cli.setMode(data.mode);
         // 确认模式切换
-        if (this.crypto.ready && this.ws.readyState === 1) {
-          const payload = this.crypto.encrypt({
-            type: 'mode_changed',
-            mode: data.mode
-          });
-          this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
-        }
+        this._sendToBuffer({ type: 'mode_changed', mode: data.mode });
         break;
 
       case 'reset_session':
         this.cli.resetSession();
-        if (this.crypto.ready && this.ws.readyState === 1) {
-          const payload = this.crypto.encrypt({ type: 'session_reset_ok' });
-          this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
-        }
+        this._sendToBuffer({ type: 'session_reset_ok' });
         break;
 
       case 'query_session_status':
-        if (this.crypto.ready && this.ws.readyState === 1) {
+        if (this.crypto.ready) {
           const status = this.cli.session.getStatus();
-          const payload = this.crypto.encrypt({
+          this._sendToBuffer({
             type: 'session_status',
             hasSession: status.hasSession,
             createdAt: status.createdAt
           });
-          this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
         }
         break;
 
@@ -293,10 +342,7 @@ class Agent {
         fs.writeFileSync(logPath, data.content);
         console.log(`[AGENT] 崩溃日志已保存: ${logPath}`);
         // 发送确认
-        if (this.crypto.ready && this.ws.readyState === 1) {
-          const payload = this.crypto.encrypt({ type: 'crash_log_received' });
-          this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
-        }
+        this._sendToBuffer({ type: 'crash_log_received' });
         break;
 
       default:
@@ -309,7 +355,7 @@ class Agent {
    */
   _handleImageMessage(data) {
     const fs = require('fs');
-    const imgDir = path.join(process.env.HOME, '.mychat', 'images');
+    const imgDir = path.join(process.env.HOME, '.mychat', process.env.MYCHAT_ENV || '', 'images');
     fs.mkdirSync(imgDir, { recursive: true });
     const imgName = `${Date.now()}.jpg`;
     const imgPath = path.join(imgDir, imgName);
@@ -320,18 +366,12 @@ class Agent {
       console.log(`[AGENT] 图片已保存: ${imgPath} (${buf.length} bytes)`);
     } catch (e) {
       console.error(`[AGENT] 图片保存失败: ${e.message}`);
-      if (this.crypto.ready && this.ws.readyState === 1) {
-        const payload = this.crypto.encrypt({ type: 'image_ack', success: false });
-        this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
-      }
+      this._sendToBuffer({ type: 'image_ack', success: false });
       return;
     }
 
     // 发送确认
-    if (this.crypto.ready && this.ws.readyState === 1) {
-      const payload = this.crypto.encrypt({ type: 'image_ack', success: true });
-      this.ws.send(JSON.stringify({ type: 'encrypted', payload }));
-    }
+    this._sendToBuffer({ type: 'image_ack', success: true });
 
     // 发给 CLI 分析
     this.store.saveMessage('user', data.text || '[图片]');

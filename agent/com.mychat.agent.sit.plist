@@ -19,6 +19,8 @@
         <string>rains2009</string>
         <key>MYCHAT_PASS</key>
         <string>Listen09%</string>
+        <key>MYCHAT_ENV</key>
+        <string>sit</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>

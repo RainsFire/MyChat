@@ -6,7 +6,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-const DB_DIR = path.join(__dirname, 'data');
+const DB_DIR = path.join(__dirname, 'data', process.env.MYCHAT_ENV || '');
 const DB_PATH = path.join(DB_DIR, 'chat.db');
 
 class Store {
